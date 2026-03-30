@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #0f172a; /* fundo escuro */
+  color: #e5e7eb; /* texto claro */
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+.subtitulo {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #6b7280;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.card,
+.bloco,
+.item-lista {
+  background: #1e293b; /* cinza escuro elegante */
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.card strong {
+  font-size: 28px;
+}
+
+.bloco {
+  margin-bottom: 24px;
+}
+
+.formulario {
+  display: grid;
+  gap: 12px;
+}
+
+.formulario input,
+.formulario select,
+.formulario textarea,
+.filtros input,
+.filtros select { background: #334155;
+color: #e5e7eb;
+border: 1px solid #475569;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.formulario textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+button {
+  background: #3b82f6;
+}
+
+button:hover {
+  background: #2563eb;
+}
+
+.filtros {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lista {
+  display: grid;
+  gap: 16px;
+}
+
+.item-lista h3 {
+  margin-top: 0;
+}
+
+.acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .filtros {
+    grid-template-columns: 1fr;
+  }
+} 
+
+.filtros-4 {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.item-lista a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.item-lista a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .filtros-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .filtros-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.acoes-formulario {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.botao-secundario {
+  background: #475569;
+}
+
+.botao-secundario:hover {
+  background: #334155;
+}
