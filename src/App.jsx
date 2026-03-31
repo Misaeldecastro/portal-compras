@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import { supabase } from "./supabase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
 import Login from "./Login";
 
 const formularioInicial = {
@@ -32,67 +44,74 @@ function App() {
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
+  // Firebase: observa login/logout em tempo real
   useEffect(() => {
-    verificarUsuario();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUsuario(user || null);
+      setCarregando(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (usuario) {
       buscarSolicitacoes();
+    } else {
+      setSolicitacoes([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
-
-  async function verificarUsuario() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session?.user) {
-      setUsuario(session.user);
-    }
-  }
 
   async function buscarSolicitacoes() {
     if (!usuario) return;
 
     setCarregando(true);
 
-    const { data, error } = await supabase
-      .from("purchase_requests")
-      .select("*")
-      .eq("user_id", usuario.id)
-      .order("id", { ascending: false });
+    try {
+      const q = query(
+        collection(db, "purchase_requests"),
+        where("user_id", "==", usuario.uid)
+      );
 
-    if (error) {
+      const snapshot = await getDocs(q);
+
+      const dadosTratados = snapshot.docs.map((d) => {
+        const item = d.data();
+
+        return {
+          id: d.id,
+          solicitante: item.solicitante,
+          departamento: item.departamento,
+          centroCusto: item.centro_custo,
+          item: item.item,
+          quantidade: item.quantidade,
+          valor: item.valor,
+          urgencia: item.urgencia,
+          status: item.status,
+          fornecedor: item.fornecedor || "",
+          linkProduto: item.link_produto || "",
+          prazoNecessario: item.prazo_necessario || "",
+          justificativa: item.justificativa,
+          observacoes: item.observacoes || "",
+          dataCriacao: item.data_criacao?.toDate
+            ? item.data_criacao.toDate().toLocaleString("pt-BR")
+            : "",
+          motivoReprovacao: item.motivo_reprovacao || "",
+          userEmail: item.user_email || "",
+        };
+      });
+
+      // opcional: ordenar por data (mais nova primeiro)
+      dadosTratados.sort((a, b) => (a.dataCriacao < b.dataCriacao ? 1 : -1));
+
+      setSolicitacoes(dadosTratados);
+    } catch (error) {
       console.error("Erro ao buscar:", error);
+      alert("Erro ao buscar solicitações");
+    } finally {
       setCarregando(false);
-      return;
     }
-
-    const dadosTratados = data.map((item) => ({
-      id: item.id,
-      solicitante: item.solicitante,
-      departamento: item.departamento,
-      centroCusto: item.centro_custo,
-      item: item.item,
-      quantidade: item.quantidade,
-      valor: item.valor,
-      urgencia: item.urgencia,
-      status: item.status,
-      fornecedor: item.fornecedor || "",
-      linkProduto: item.link_produto || "",
-      prazoNecessario: item.prazo_necessario || "",
-      justificativa: item.justificativa,
-      observacoes: item.observacoes || "",
-      dataCriacao: item.data_criacao
-        ? new Date(item.data_criacao).toLocaleString("pt-BR")
-        : "",
-      motivoReprovacao: item.motivo_reprovacao || "",
-      userEmail: item.user_email || "",
-    }));
-
-    setSolicitacoes(dadosTratados);
-    setCarregando(false);
   }
 
   function alterarFormulario(e) {
@@ -115,73 +134,47 @@ function App() {
 
     setSalvando(true);
 
-    if (idEmEdicao) {
-      const { error } = await supabase
-        .from("purchase_requests")
-        .update({
-          solicitante: formulario.solicitante,
-          departamento: formulario.departamento,
-          centro_custo: formulario.centroCusto,
-          item: formulario.item,
-          quantidade: Number(formulario.quantidade),
-          valor: Number(formulario.valor),
-          urgencia: formulario.urgencia,
-          fornecedor: formulario.fornecedor,
-          link_produto: formulario.linkProduto,
-          prazo_necessario: formulario.prazoNecessario || null,
-          justificativa: formulario.justificativa,
-          observacoes: formulario.observacoes,
-        })
-        .eq("id", idEmEdicao)
-        .eq("user_id", usuario.id);
+    const payload = {
+      solicitante: formulario.solicitante,
+      departamento: formulario.departamento,
+      centro_custo: formulario.centroCusto,
+      item: formulario.item,
+      quantidade: Number(formulario.quantidade),
+      valor: Number(formulario.valor),
+      urgencia: formulario.urgencia,
+      fornecedor: formulario.fornecedor,
+      link_produto: formulario.linkProduto,
+      prazo_necessario: formulario.prazoNecessario || null,
+      justificativa: formulario.justificativa,
+      observacoes: formulario.observacoes,
+    };
 
-      if (error) {
-        alert("Erro ao editar");
-        console.error(error);
-        setSalvando(false);
-        return;
+    try {
+      if (idEmEdicao) {
+        await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
+
+        alert("Solicitação atualizada com sucesso!");
+      } else {
+        await addDoc(collection(db, "purchase_requests"), {
+          ...payload,
+          status: "Pendente",
+          motivo_reprovacao: "",
+          user_id: usuario.uid, // firebase usa uid
+          user_email: usuario.email,
+          data_criacao: serverTimestamp(),
+        });
+
+        alert("Salvo com sucesso!");
       }
 
-      alert("Solicitação atualizada com sucesso!");
       limparFormulario();
       buscarSolicitacoes();
-      setSalvando(false);
-      return;
-    }
-
-    const { error } = await supabase
-      .from("purchase_requests")
-      .insert([
-        {
-          solicitante: formulario.solicitante,
-          departamento: formulario.departamento,
-          centro_custo: formulario.centroCusto,
-          item: formulario.item,
-          quantidade: Number(formulario.quantidade),
-          valor: Number(formulario.valor),
-          urgencia: formulario.urgencia,
-          status: "Pendente",
-          fornecedor: formulario.fornecedor,
-          link_produto: formulario.linkProduto,
-          prazo_necessario: formulario.prazoNecessario || null,
-          justificativa: formulario.justificativa,
-          observacoes: formulario.observacoes,
-          user_id: usuario.id,
-          user_email: usuario.email,
-        },
-      ]);
-
-    if (error) {
-      alert("Erro ao salvar");
+    } catch (error) {
+      alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
       console.error(error);
+    } finally {
       setSalvando(false);
-      return;
     }
-
-    alert("Salvo com sucesso!");
-    limparFormulario();
-    buscarSolicitacoes();
-    setSalvando(false);
   }
 
   function editarSolicitacao(solicitacao) {
@@ -211,23 +204,18 @@ function App() {
 
     if (!confirmar || !usuario) return;
 
-    const { error } = await supabase
-      .from("purchase_requests")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", usuario.id);
+    try {
+      await deleteDoc(doc(db, "purchase_requests", id));
 
-    if (error) {
+      if (idEmEdicao === id) {
+        limparFormulario();
+      }
+
+      buscarSolicitacoes();
+    } catch (error) {
       alert("Erro ao excluir");
       console.error(error);
-      return;
     }
-
-    if (idEmEdicao === id) {
-      limparFormulario();
-    }
-
-    buscarSolicitacoes();
   }
 
   async function mudarStatus(id, novoStatus) {
@@ -241,22 +229,17 @@ function App() {
       motivo = resposta;
     }
 
-    const { error } = await supabase
-      .from("purchase_requests")
-      .update({
+    try {
+      await updateDoc(doc(db, "purchase_requests", id), {
         status: novoStatus,
         motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
-      })
-      .eq("id", id)
-      .eq("user_id", usuario.id);
+      });
 
-    if (error) {
+      buscarSolicitacoes();
+    } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
-      return;
     }
-
-    buscarSolicitacoes();
   }
 
   const solicitacoesFiltradas = useMemo(() => {
@@ -270,8 +253,7 @@ function App() {
         s.centroCusto.toLowerCase().includes(texto) ||
         (s.fornecedor || "").toLowerCase().includes(texto);
 
-      const bateStatus =
-        filtroStatus === "Todos" || s.status === filtroStatus;
+      const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
 
       const bateUrgencia =
         filtroUrgencia === "Todas" || s.urgencia === filtroUrgencia;
@@ -280,20 +262,9 @@ function App() {
         filtroDepartamento === "Todos" ||
         s.departamento === filtroDepartamento;
 
-      return (
-        bateBusca &&
-        bateStatus &&
-        bateUrgencia &&
-        bateDepartamento
-      );
+      return bateBusca && bateStatus && bateUrgencia && bateDepartamento;
     });
-  }, [
-    solicitacoes,
-    busca,
-    filtroStatus,
-    filtroUrgencia,
-    filtroDepartamento,
-  ]);
+  }, [solicitacoes, busca, filtroStatus, filtroUrgencia, filtroDepartamento]);
 
   const departamentosUnicos = useMemo(() => {
     const lista = solicitacoes.map((s) => s.departamento).filter(Boolean);
@@ -319,7 +290,7 @@ function App() {
 
       <button
         onClick={async () => {
-          await supabase.auth.signOut();
+          await signOut(auth); // firebase logout
           setUsuario(null);
         }}
       >
