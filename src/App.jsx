@@ -44,7 +44,14 @@ function App() {
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
-  // Firebase: observa login/logout em tempo real
+  useEffect(() => {
+  if (usuario) {
+    console.log("UID logado:", usuario.uid);
+  }
+  }, [usuario]);
+
+
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUsuario(user || null);
@@ -78,6 +85,8 @@ function App() {
 
       const dadosTratados = snapshot.docs.map((d) => {
         const item = d.data();
+        const dataObj =
+          item.data_criacao?.toDate ? item.data_criacao.toDate() : null;
 
         return {
           id: d.id,
@@ -94,16 +103,14 @@ function App() {
           prazoNecessario: item.prazo_necessario || "",
           justificativa: item.justificativa,
           observacoes: item.observacoes || "",
-          dataCriacao: item.data_criacao?.toDate
-            ? item.data_criacao.toDate().toLocaleString("pt-BR")
-            : "",
+          dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
+          dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
           motivoReprovacao: item.motivo_reprovacao || "",
           userEmail: item.user_email || "",
         };
       });
 
-      // opcional: ordenar por data (mais nova primeiro)
-      dadosTratados.sort((a, b) => (a.dataCriacao < b.dataCriacao ? 1 : -1));
+      dadosTratados.sort((a, b) => b.dataCriacaoTs - a.dataCriacaoTs);
 
       setSolicitacoes(dadosTratados);
     } catch (error) {
@@ -152,18 +159,16 @@ function App() {
     try {
       if (idEmEdicao) {
         await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
-
         alert("Solicitação atualizada com sucesso!");
       } else {
         await addDoc(collection(db, "purchase_requests"), {
           ...payload,
           status: "Pendente",
           motivo_reprovacao: "",
-          user_id: usuario.uid, // firebase usa uid
+          user_id: usuario.uid,
           user_email: usuario.email,
           data_criacao: serverTimestamp(),
         });
-
         alert("Salvo com sucesso!");
       }
 
@@ -290,7 +295,7 @@ function App() {
 
       <button
         onClick={async () => {
-          await signOut(auth); // firebase logout
+          await signOut(auth);
           setUsuario(null);
         }}
       >

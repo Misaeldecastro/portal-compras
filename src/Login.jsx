@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { supabase } from "./supabase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
+import { auth } from "./firebase";
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -8,31 +12,23 @@ function Login({ onLogin }) {
   async function entrar(e) {
     e.preventDefault();
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
-
-    if (error) {
-      alert("Erro: " + error.message);
-      return;
+    try {
+      const credencial = await signInWithEmailAndPassword(auth, email, senha);
+      onLogin(credencial.user);
+    } catch (error) {
+      console.error("Erro login:", error);
+      alert(`${error.code} - ${error.message}`);
     }
-
-    onLogin(data.user);
   }
 
   async function cadastrar() {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password: senha,
-    });
-
-    if (error) {
-      alert("Erro: " + error.message);
-      return;
+    try {
+      await createUserWithEmailAndPassword(auth, email, senha);
+      alert("Usuário criado! Agora clique em Entrar.");
+    } catch (error) {
+      console.error("Erro cadastro:", error);
+      alert(`${error.code} - ${error.message}`);
     }
-
-    alert("Usuário criado!");
   }
 
   return (
