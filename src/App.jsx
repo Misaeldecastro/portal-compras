@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./Login";
+import logo from "./assets/logo.png";
 
 const formularioInicial = {
   solicitante: "",
@@ -33,6 +34,7 @@ const formularioInicial = {
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
+  const [paginaAtiva, setPaginaAtiva] = useState("dashboard");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -45,34 +47,21 @@ function App() {
   const [formulario, setFormulario] = useState(formularioInicial);
 
   useEffect(() => {
-  if (usuario) {
-    console.log("UID logado:", usuario.uid);
-  }
-  }, [usuario]);
-
-
-  
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUsuario(user || null);
       setCarregando(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (usuario) {
-      buscarSolicitacoes();
-    } else {
-      setSolicitacoes([]);
-    }
+    if (usuario) buscarSolicitacoes();
+    else setSolicitacoes([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
 
   async function buscarSolicitacoes() {
     if (!usuario) return;
-
     setCarregando(true);
 
     try {
@@ -111,7 +100,6 @@ function App() {
       });
 
       dadosTratados.sort((a, b) => b.dataCriacaoTs - a.dataCriacaoTs);
-
       setSolicitacoes(dadosTratados);
     } catch (error) {
       console.error("Erro ao buscar:", error);
@@ -133,11 +121,7 @@ function App() {
 
   async function enviarSolicitacao(e) {
     e.preventDefault();
-
-    if (!usuario) {
-      alert("Você precisa estar logado.");
-      return;
-    }
+    if (!usuario) return alert("Você precisa estar logado.");
 
     setSalvando(true);
 
@@ -173,7 +157,8 @@ function App() {
       }
 
       limparFormulario();
-      buscarSolicitacoes();
+      await buscarSolicitacoes();
+      setPaginaAtiva("minhas");
     } catch (error) {
       alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
       console.error(error);
@@ -182,41 +167,32 @@ function App() {
     }
   }
 
-  function editarSolicitacao(solicitacao) {
-    setIdEmEdicao(solicitacao.id);
+  function editarSolicitacao(s) {
+    setIdEmEdicao(s.id);
     setFormulario({
-      solicitante: solicitacao.solicitante,
-      departamento: solicitacao.departamento,
-      centroCusto: solicitacao.centroCusto,
-      item: solicitacao.item,
-      quantidade: solicitacao.quantidade,
-      valor: solicitacao.valor,
-      urgencia: solicitacao.urgencia,
-      fornecedor: solicitacao.fornecedor,
-      linkProduto: solicitacao.linkProduto,
-      prazoNecessario: solicitacao.prazoNecessario,
-      justificativa: solicitacao.justificativa,
-      observacoes: solicitacao.observacoes,
+      solicitante: s.solicitante,
+      departamento: s.departamento,
+      centroCusto: s.centroCusto,
+      item: s.item,
+      quantidade: s.quantidade,
+      valor: s.valor,
+      urgencia: s.urgencia,
+      fornecedor: s.fornecedor,
+      linkProduto: s.linkProduto,
+      prazoNecessario: s.prazoNecessario,
+      justificativa: s.justificativa,
+      observacoes: s.observacoes,
     });
-
+    setPaginaAtiva("nova");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function excluirSolicitacao(id) {
-    const confirmar = window.confirm(
-      "Tem certeza que deseja excluir esta solicitação?"
-    );
-
-    if (!confirmar || !usuario) return;
-
+    if (!window.confirm("Tem certeza que deseja excluir esta solicitação?")) return;
     try {
       await deleteDoc(doc(db, "purchase_requests", id));
-
-      if (idEmEdicao === id) {
-        limparFormulario();
-      }
-
-      buscarSolicitacoes();
+      if (idEmEdicao === id) limparFormulario();
+      await buscarSolicitacoes();
     } catch (error) {
       alert("Erro ao excluir");
       console.error(error);
@@ -224,14 +200,11 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
-    if (!usuario) return;
-
     let motivo = "";
-
     if (novoStatus === "Reprovada") {
-      const resposta = window.prompt("Digite o motivo da reprovação:");
-      if (resposta === null) return;
-      motivo = resposta;
+      const r = window.prompt("Digite o motivo da reprovação:");
+      if (r === null) return;
+      motivo = r;
     }
 
     try {
@@ -239,8 +212,7 @@ function App() {
         status: novoStatus,
         motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
       });
-
-      buscarSolicitacoes();
+      await buscarSolicitacoes();
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
@@ -250,7 +222,6 @@ function App() {
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
-
       const bateBusca =
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
@@ -259,22 +230,18 @@ function App() {
         (s.fornecedor || "").toLowerCase().includes(texto);
 
       const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
-
-      const bateUrgencia =
-        filtroUrgencia === "Todas" || s.urgencia === filtroUrgencia;
-
+      const bateUrgencia = filtroUrgencia === "Todas" || s.urgencia === filtroUrgencia;
       const bateDepartamento =
-        filtroDepartamento === "Todos" ||
-        s.departamento === filtroDepartamento;
+        filtroDepartamento === "Todos" || s.departamento === filtroDepartamento;
 
       return bateBusca && bateStatus && bateUrgencia && bateDepartamento;
     });
   }, [solicitacoes, busca, filtroStatus, filtroUrgencia, filtroDepartamento]);
 
-  const departamentosUnicos = useMemo(() => {
-    const lista = solicitacoes.map((s) => s.departamento).filter(Boolean);
-    return [...new Set(lista)];
-  }, [solicitacoes]);
+  const departamentosUnicos = useMemo(
+    () => [...new Set(solicitacoes.map((s) => s.departamento).filter(Boolean))],
+    [solicitacoes]
+  );
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -282,272 +249,166 @@ function App() {
   const aprovadas = solicitacoes.filter((s) => s.status === "Aprovada").length;
   const compradas = solicitacoes.filter((s) => s.status === "Comprado").length;
 
-  if (!usuario) {
-    return <Login onLogin={setUsuario} />;
-  }
+  if (!usuario) return <Login onLogin={setUsuario} />;
 
   return (
-    <div className="container">
-      <h1>Portal de Solicitações de Compras</h1>
-      <p className="subtitulo">
-        Usuário logado: <strong>{usuario.email}</strong>
-      </p>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <img src={logo} alt="Logo" className="logo-sidebar" />
+        <h2 className="logo">Oliv-e Saúde</h2>
 
-      <button
-        onClick={async () => {
-          await signOut(auth);
-          setUsuario(null);
-        }}
-      >
-        Sair
-      </button>
+        <nav className="menu">
+          <button className="menu-item" onClick={() => setPaginaAtiva("dashboard")}>
+            Dashboard
+          </button>
+          <button className="menu-item" onClick={() => setPaginaAtiva("nova")}>
+            Nova Solicitação
+          </button>
+          <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
+            Minhas Solicitações
+          </button>
+        </nav>
+      </aside>
 
-      <div className="cards">
-        <div className="card">
-          <h3>Total</h3>
-          <strong>{total}</strong>
-        </div>
-        <div className="card">
-          <h3>Pendentes</h3>
-          <strong>{pendentes}</strong>
-        </div>
-        <div className="card">
-          <h3>Em análise</h3>
-          <strong>{emAnalise}</strong>
-        </div>
-        <div className="card">
-          <h3>Aprovadas</h3>
-          <strong>{aprovadas}</strong>
-        </div>
-        <div className="card">
-          <h3>Compradas</h3>
-          <strong>{compradas}</strong>
-        </div>
-      </div>
-
-      <div className="bloco">
-        <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
-
-        <form onSubmit={enviarSolicitacao} className="formulario">
-          <input
-            name="solicitante"
-            placeholder="Solicitante"
-            value={formulario.solicitante}
-            onChange={alterarFormulario}
-            required
-          />
-          <input
-            name="departamento"
-            placeholder="Departamento"
-            value={formulario.departamento}
-            onChange={alterarFormulario}
-            required
-          />
-          <input
-            name="centroCusto"
-            placeholder="Centro de custo"
-            value={formulario.centroCusto}
-            onChange={alterarFormulario}
-            required
-          />
-          <input
-            name="item"
-            placeholder="Item solicitado"
-            value={formulario.item}
-            onChange={alterarFormulario}
-            required
-          />
-          <input
-            name="quantidade"
-            type="number"
-            min="1"
-            value={formulario.quantidade}
-            onChange={alterarFormulario}
-            required
-          />
-          <input
-            name="valor"
-            type="number"
-            min="0"
-            value={formulario.valor}
-            onChange={alterarFormulario}
-            required
-          />
-          <select
-            name="urgencia"
-            value={formulario.urgencia}
-            onChange={alterarFormulario}
+      <div className="main-area">
+        <header className="topbar">
+          <h1>Portal de Solicitações</h1>
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              setUsuario(null);
+            }}
           >
-            <option>Alta</option>
-            <option>Média</option>
-            <option>Baixa</option>
-          </select>
-          <input
-            name="fornecedor"
-            placeholder="Fornecedor sugerido"
-            value={formulario.fornecedor}
-            onChange={alterarFormulario}
-          />
-          <input
-            name="linkProduto"
-            placeholder="Link do produto"
-            value={formulario.linkProduto}
-            onChange={alterarFormulario}
-          />
-          <input
-            name="prazoNecessario"
-            type="date"
-            value={formulario.prazoNecessario}
-            onChange={alterarFormulario}
-          />
-          <textarea
-            name="justificativa"
-            placeholder="Justificativa"
-            value={formulario.justificativa}
-            onChange={alterarFormulario}
-            required
-          />
-          <textarea
-            name="observacoes"
-            placeholder="Observações adicionais"
-            value={formulario.observacoes}
-            onChange={alterarFormulario}
-          />
+            Sair
+          </button>
+        </header>
 
-          <div className="acoes-formulario">
-            <button type="submit" disabled={salvando}>
-              {salvando
-                ? "Salvando..."
-                : idEmEdicao
-                ? "Salvar edição"
-                : "Enviar solicitação"}
-            </button>
+        <main className="content">
+          <p className="subtitulo">
+            Usuário logado: <strong>{usuario.email}</strong>
+          </p>
 
-            {idEmEdicao && (
-              <button
-                type="button"
-                onClick={limparFormulario}
-                className="botao-secundario"
-              >
-                Cancelar edição
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
+          {paginaAtiva === "dashboard" && (
+            <div className="cards">
+              <div className="card"><h3>Total</h3><strong>{total}</strong></div>
+              <div className="card"><h3>Pendentes</h3><strong>{pendentes}</strong></div>
+              <div className="card"><h3>Em análise</h3><strong>{emAnalise}</strong></div>
+              <div className="card"><h3>Aprovadas</h3><strong>{aprovadas}</strong></div>
+              <div className="card"><h3>Compradas</h3><strong>{compradas}</strong></div>
+            </div>
+          )}
 
-      <div className="bloco">
-        <h2>Minhas solicitações</h2>
+          {paginaAtiva === "nova" && (
+            <div className="bloco">
+              <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
+              <form onSubmit={enviarSolicitacao} className="formulario">
+                <input name="solicitante" placeholder="Solicitante" value={formulario.solicitante} onChange={alterarFormulario} required />
+                <input name="departamento" placeholder="Departamento" value={formulario.departamento} onChange={alterarFormulario} required />
+                <input name="centroCusto" placeholder="Centro de custo" value={formulario.centroCusto} onChange={alterarFormulario} required />
+                <input name="item" placeholder="Item solicitado" value={formulario.item} onChange={alterarFormulario} required />
+                <input name="quantidade" type="number" min="1" value={formulario.quantidade} onChange={alterarFormulario} required />
+                <input name="valor" type="number" min="0" value={formulario.valor} onChange={alterarFormulario} required />
+                <select name="urgencia" value={formulario.urgencia} onChange={alterarFormulario}>
+                  <option>Alta</option><option>Média</option><option>Baixa</option>
+                </select>
+                <input name="fornecedor" placeholder="Fornecedor sugerido" value={formulario.fornecedor} onChange={alterarFormulario} />
+                <input name="linkProduto" placeholder="Link do produto" value={formulario.linkProduto} onChange={alterarFormulario} />
+                <input name="prazoNecessario" type="date" value={formulario.prazoNecessario} onChange={alterarFormulario} />
+                <textarea name="justificativa" placeholder="Justificativa" value={formulario.justificativa} onChange={alterarFormulario} required />
+                <textarea name="observacoes" placeholder="Observações adicionais" value={formulario.observacoes} onChange={alterarFormulario} />
 
-        <div className="filtros filtros-4">
-          <input
-            placeholder="Buscar por solicitante, departamento, item, centro de custo ou fornecedor"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
-
-          <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-          >
-            <option>Todos</option>
-            <option>Pendente</option>
-            <option>Em análise</option>
-            <option>Aprovada</option>
-            <option>Reprovada</option>
-            <option>Comprado</option>
-          </select>
-
-          <select
-            value={filtroUrgencia}
-            onChange={(e) => setFiltroUrgencia(e.target.value)}
-          >
-            <option>Todas</option>
-            <option>Alta</option>
-            <option>Média</option>
-            <option>Baixa</option>
-          </select>
-
-          <select
-            value={filtroDepartamento}
-            onChange={(e) => setFiltroDepartamento(e.target.value)}
-          >
-            <option>Todos</option>
-            {departamentosUnicos.map((dep) => (
-              <option key={dep} value={dep}>
-                {dep}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {carregando ? (
-          <p>Carregando...</p>
-        ) : (
-          <div className="lista">
-            {solicitacoesFiltradas.map((s) => (
-              <div key={s.id} className="item-lista">
-                <h3>{s.item}</h3>
-                <p><strong>Solicitante:</strong> {s.solicitante}</p>
-                <p><strong>Departamento:</strong> {s.departamento}</p>
-                <p><strong>Centro de custo:</strong> {s.centroCusto}</p>
-                <p><strong>Quantidade:</strong> {s.quantidade}</p>
-                <p><strong>Valor:</strong> R$ {s.valor}</p>
-                <p><strong>Urgência:</strong> {s.urgencia}</p>
-                <p><strong>Status:</strong> {s.status}</p>
-                <p><strong>Fornecedor:</strong> {s.fornecedor || "-"}</p>
-                <p><strong>Usuário:</strong> {s.userEmail || "-"}</p>
-                <p>
-                  <strong>Link do produto:</strong>{" "}
-                  {s.linkProduto ? (
-                    <a href={s.linkProduto} target="_blank" rel="noreferrer">
-                      Abrir link
-                    </a>
-                  ) : (
-                    "-"
+                <div className="acoes-formulario">
+                  <button type="submit" disabled={salvando}>
+                    {salvando ? "Salvando..." : idEmEdicao ? "Salvar edição" : "Enviar solicitação"}
+                  </button>
+                  {idEmEdicao && (
+                    <button type="button" onClick={limparFormulario} className="botao-secundario">
+                      Cancelar edição
+                    </button>
                   )}
-                </p>
-                <p><strong>Prazo necessário:</strong> {s.prazoNecessario || "-"}</p>
-                <p><strong>Data da solicitação:</strong> {s.dataCriacao}</p>
-                <p><strong>Justificativa:</strong> {s.justificativa}</p>
-                <p><strong>Observações:</strong> {s.observacoes || "-"}</p>
-
-                {s.motivoReprovacao && (
-                  <p><strong>Motivo da reprovação:</strong> {s.motivoReprovacao}</p>
-                )}
-
-                <div className="acoes">
-                  <button onClick={() => editarSolicitacao(s)}>Editar</button>
-                  <button onClick={() => mudarStatus(s.id, "Pendente")}>
-                    Pendente
-                  </button>
-                  <button onClick={() => mudarStatus(s.id, "Em análise")}>
-                    Em análise
-                  </button>
-                  <button onClick={() => mudarStatus(s.id, "Aprovada")}>
-                    Aprovar
-                  </button>
-                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
-                    Comprado
-                  </button>
-                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
-                    Reprovar
-                  </button>
-                  <button
-                    onClick={() => excluirSolicitacao(s.id)}
-                    style={{ background: "#dc2626" }}
-                  >
-                    Excluir
-                  </button>
                 </div>
-              </div>
-            ))}
+              </form>
+            </div>
+          )}
 
-            {solicitacoesFiltradas.length === 0 && (
-              <p>Nenhuma solicitação encontrada.</p>
-            )}
-          </div>
-        )}
+          {paginaAtiva === "minhas" && (
+            <div className="bloco">
+              <h2>Minhas solicitações</h2>
+
+              <div className="filtros filtros-4">
+                <input
+                  placeholder="Buscar por solicitante, departamento, item, centro de custo ou fornecedor"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
+                <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
+                  <option>Todos</option><option>Pendente</option><option>Em análise</option>
+                  <option>Aprovada</option><option>Reprovada</option><option>Comprado</option>
+                </select>
+                <select value={filtroUrgencia} onChange={(e) => setFiltroUrgencia(e.target.value)}>
+                  <option>Todas</option><option>Alta</option><option>Média</option><option>Baixa</option>
+                </select>
+                <select value={filtroDepartamento} onChange={(e) => setFiltroDepartamento(e.target.value)}>
+                  <option>Todos</option>
+                  {departamentosUnicos.map((dep) => (
+                    <option key={dep} value={dep}>{dep}</option>
+                  ))}
+                </select>
+              </div>
+
+              {carregando ? (
+                <p>Carregando...</p>
+              ) : (
+                <div className="lista">
+                  {solicitacoesFiltradas.map((s) => (
+                    <div key={s.id} className="item-lista">
+                      <h3>{s.item}</h3>
+                      <p><strong>Solicitante:</strong> {s.solicitante}</p>
+                      <p><strong>Departamento:</strong> {s.departamento}</p>
+                      <p><strong>Centro de custo:</strong> {s.centroCusto}</p>
+                      <p><strong>Quantidade:</strong> {s.quantidade}</p>
+                      <p><strong>Valor:</strong> R$ {s.valor}</p>
+                      <p><strong>Urgência:</strong> {s.urgencia}</p>
+                      <p><strong>Status:</strong> {s.status}</p>
+                      <p><strong>Fornecedor:</strong> {s.fornecedor || "-"}</p>
+                      <p><strong>Usuário:</strong> {s.userEmail || "-"}</p>
+                      <p>
+                        <strong>Link do produto:</strong>{" "}
+                        {s.linkProduto ? (
+                          <a href={s.linkProduto} target="_blank" rel="noreferrer">Abrir link</a>
+                        ) : "-"}
+                      </p>
+                      <p><strong>Prazo necessário:</strong> {s.prazoNecessario || "-"}</p>
+                      <p><strong>Data da solicitação:</strong> {s.dataCriacao}</p>
+                      <p><strong>Justificativa:</strong> {s.justificativa}</p>
+                      <p><strong>Observações:</strong> {s.observacoes || "-"}</p>
+
+                      {s.motivoReprovacao && (
+                        <p><strong>Motivo da reprovação:</strong> {s.motivoReprovacao}</p>
+                      )}
+
+                      <div className="acoes">
+                        <button onClick={() => editarSolicitacao(s)}>Editar</button>
+                        <button onClick={() => mudarStatus(s.id, "Pendente")}>Pendente</button>
+                        <button onClick={() => mudarStatus(s.id, "Em análise")}>Em análise</button>
+                        <button onClick={() => mudarStatus(s.id, "Aprovada")}>Aprovar</button>
+                        <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
+                        <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
+                        <button onClick={() => excluirSolicitacao(s.id)} style={{ background: "#dc2626" }}>
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {solicitacoesFiltradas.length === 0 && (
+                    <p>Nenhuma solicitação encontrada.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

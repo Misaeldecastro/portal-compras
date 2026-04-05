@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "./firebase";
+import logo from "./assets/logo.png";
+import "./App.css";
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -32,6 +34,12 @@ function Login({ onLogin }) {
   }
 
   return (
+  <>
+
+    <div className="login-logo-top">
+      <img src={logo} alt= "oliv-e"/>
+    </div>
+
     <div className="container">
       <h1>Login</h1>
 
@@ -59,6 +67,7 @@ function Login({ onLogin }) {
         Criar conta
       </button>
     </div>
+  </>
   );
 }
 

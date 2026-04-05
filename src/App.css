@@ -1,129 +1,298 @@
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+
+  --sidebar: #0f172a;
+  --sidebar-hover: #1e293b;
+
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #dbe2ea;
+
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+
+.login-logo-top {
+  position: absolute;
+  top: 50px;
+  left: 700px;
+  z-index: 10;
+}
+
+.login-logo-top img{
+  width: 125px !important;
+  height: 125px !important;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.logo-sidebar {
+  width: 140px;
+  margin-bottom: 20px;
+}
+
 * {
   box-sizing: border-box;
 }
 
-body {
+html,
+body,
+#root {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #0f172a; /* fundo escuro */
-  color: #e5e7eb; /* texto claro */
+  min-height: 100%;
+  width: 100%;
 }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+/* ===== LOGIN ===== */
 
 .container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px;
+  width: 100%;
+  max-width: 430px;
+  margin: 170px auto;
+  text-align: center;
+  padding: 0 16px;
 }
 
-h1 {
-  margin-bottom: 8px;
-}
-
-.subtitulo {
-  margin-top: 0;
-  margin-bottom: 24px;
-  color: #6b7280;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.card,
-.bloco,
-.item-lista {
-  background: #1e293b; /* cinza escuro elegante */
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.card h3 {
-  margin-top: 0;
-  font-size: 16px;
-}
-
-.card strong {
-  font-size: 28px;
-}
-
-.bloco {
-  margin-bottom: 24px;
+.container h1 {
+  margin: 0 0 28px;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 800;
+  color: #0b1736;
+  letter-spacing: -1px;
 }
 
 .formulario {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .formulario input,
 .formulario select,
-.formulario textarea,
-.filtros input,
-.filtros select { background: #334155;
-color: #e5e7eb;
-border: 1px solid #475569;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 14px;
-}
-
 .formulario textarea {
-  min-height: 100px;
-  resize: vertical;
+  width: 100%;
+  padding: 15px 16px;
+  border: 1px solid #cfd8e3;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 16px;
+  outline: none;
+  transition: 0.2s ease;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
 }
 
-button {
-  background: #3b82f6;
+.formulario input::placeholder,
+.formulario textarea::placeholder {
+  color: #94a3b8;
 }
 
-button:hover {
-  background: #2563eb;
+.formulario input:focus,
+.formulario select:focus,
+.formulario textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
 }
 
-.filtros {
+.formulario button {
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 15px 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+}
+
+.formulario button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.formulario button:active {
+  transform: translateY(0);
+}
+
+.container > button:last-child {
+  margin-top: 14px;
+  background: transparent;
+  color: #0b1736;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.container > button:last-child:hover {
+  text-decoration: underline;
+}
+
+/* ===== APP SHELL ===== */
+
+.app-shell {
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: 280px 1fr;
+  background: var(--bg);
 }
 
-.lista {
-  display: grid;
-  gap: 16px;
+.sidebar {
+  background: var(--sidebar);
+  color: #f8fafc;
+  padding: 28px 20px;
 }
 
-.item-lista h3 {
-  margin-top: 0;
+.logo {
+  color: #ffffff;
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 22px;
 }
 
-.acoes {
+.sidebar a {
+  color: #dbe4f0;
+  text-decoration: none;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: transparent;
+  color: #dbe4f0;
+  transition: 0.2s ease;
+}
+
+.menu-item:hover,
+.sidebar a.active,
+.sidebar .menu-item.active {
+  background: var(--sidebar-hover);
+  color: #ffffff;
+}
+
+.main-area {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
+  flex-direction: column;
+  min-width: 0;
 }
 
-@media (max-width: 700px) {
-  .filtros {
-    grid-template-columns: 1fr;
-  }
-} 
+.topbar {
+  height: 88px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
 
-.filtros-4 {
+.topbar h1 {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 800;
+  color: #0b1736;
+  letter-spacing: -1px;
+}
+
+.content {
+  padding: 24px;
+}
+
+/* ===== CARDS ===== */
+
+.cards {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.card strong {
+  font-size: 38px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+/* ===== BLOCOS ===== */
+
+.bloco,
+.item-lista {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+/* ===== FORMULÁRIOS INTERNOS ===== */
+
+.filtros input,
+.filtros select,
+.bloco input,
+.bloco select,
+.bloco textarea,
+.item-lista input,
+.item-lista select,
+.item-lista textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 15px;
+  transition: 0.2s ease;
+}
+
+.filtros input:focus,
+.filtros select:focus,
+.bloco input:focus,
+.bloco select:focus,
+.bloco textarea:focus,
+.item-lista input:focus,
+.item-lista select:focus,
+.item-lista textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .item-lista a {
-  color: #60a5fa;
+  color: var(--primary);
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -131,29 +300,81 @@ button:hover {
   text-decoration: underline;
 }
 
-@media (max-width: 900px) {
-  .filtros-4 {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 700px) {
-  .filtros-4 {
-    grid-template-columns: 1fr;
-  }
-}
-
-
+.acoes,
 .acoes-formulario {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* ===== BOTÕES DO SISTEMA ===== */
+
+.app-shell button,
+.bloco button,
+.item-lista button,
+.topbar button {
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.app-shell button:hover,
+.bloco button:hover,
+.item-lista button:hover,
+.topbar button:hover {
+  background: var(--primary-dark);
 }
 
 .botao-secundario {
-  background: #475569;
+  background: #e5e7eb !important;
+  color: #111827 !important;
 }
 
 .botao-secundario:hover {
-  background: #334155;
+  background: #d1d5db !important;
+}
+
+/* ===== RESPONSIVO ===== */
+
+@media (max-width: 1200px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .topbar h1 {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .container {
+    margin: 70px auto;
+    max-width: 430px;
+  }
+
+  .topbar {
+    padding: 0 18px;
+  }
+
+  .topbar h1 {
+    font-size: 28px;
+  }
+
+  .content {
+    padding: 18px;
+  }
 }
