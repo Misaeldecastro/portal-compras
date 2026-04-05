@@ -120,52 +120,84 @@ function App() {
   }
 
   async function enviarSolicitacao(e) {
-    e.preventDefault();
-    if (!usuario) return alert("Você precisa estar logado.");
+  e.preventDefault();
+  if (!usuario) return alert("Você precisa estar logado.");
 
-    setSalvando(true);
+  setSalvando(true);
 
-    const payload = {
-      solicitante: formulario.solicitante,
-      departamento: formulario.departamento,
-      centro_custo: formulario.centroCusto,
-      item: formulario.item,
-      quantidade: Number(formulario.quantidade),
-      valor: Number(formulario.valor),
-      urgencia: formulario.urgencia,
-      fornecedor: formulario.fornecedor,
-      link_produto: formulario.linkProduto,
-      prazo_necessario: formulario.prazoNecessario || null,
-      justificativa: formulario.justificativa,
-      observacoes: formulario.observacoes,
-    };
+  const payload = {
+    solicitante: formulario.solicitante,
+    departamento: formulario.departamento,
+    centro_custo: formulario.centroCusto,
+    item: formulario.item,
+    quantidade: Number(formulario.quantidade),
+    valor: Number(formulario.valor),
+    urgencia: formulario.urgencia,
+    fornecedor: formulario.fornecedor,
+    link_produto: formulario.linkProduto,
+    prazo_necessario: formulario.prazoNecessario || null,
+    justificativa: formulario.justificativa,
+    observacoes: formulario.observacoes,
+  };
 
-    try {
-      if (idEmEdicao) {
-        await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
-        alert("Solicitação atualizada com sucesso!");
-      } else {
-        await addDoc(collection(db, "purchase_requests"), {
-          ...payload,
-          status: "Pendente",
-          motivo_reprovacao: "",
-          user_id: usuario.uid,
-          user_email: usuario.email,
-          data_criacao: serverTimestamp(),
+  try {
+    if (idEmEdicao) {
+      await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
+      alert("Solicitação atualizada com sucesso!");
+    } else {
+      await addDoc(collection(db, "purchase_requests"), {
+        ...payload,
+        status: "Pendente",
+        motivo_reprovacao: "",
+        user_id: usuario.uid,
+        user_email: usuario.email,
+        data_criacao: serverTimestamp(),
+      });
+
+      try {
+        const respostaSlack = await fetch("/api/slack", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            solicitante: formulario.solicitante,
+            departamento: formulario.departamento,
+            centroCusto: formulario.centroCusto,
+            item: formulario.item,
+            quantidade: Number(formulario.quantidade),
+            valor: Number(formulario.valor),
+            urgencia: formulario.urgencia,
+            fornecedor: formulario.fornecedor,
+            linkProduto: formulario.linkProduto,
+            prazoNecessario: formulario.prazoNecessario || "",
+            justificativa: formulario.justificativa,
+            observacoes: formulario.observacoes,
+            usuarioEmail: usuario.email,
+          }),
         });
-        alert("Salvo com sucesso!");
+
+        if (!respostaSlack.ok) {
+          const erroSlack = await respostaSlack.json().catch(() => ({}));
+          console.error("Erro ao enviar para o Slack:", erroSlack);
+        }
+      } catch (erroSlack) {
+        console.error("Erro ao chamar /api/slack:", erroSlack);
       }
 
-      limparFormulario();
-      await buscarSolicitacoes();
-      setPaginaAtiva("minhas");
-    } catch (error) {
-      alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
-      console.error(error);
-    } finally {
-      setSalvando(false);
+      alert("Salvo com sucesso!");
     }
+
+    limparFormulario();
+    await buscarSolicitacoes();
+    setPaginaAtiva("minhas");
+  } catch (error) {
+    alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
+    console.error(error);
+  } finally {
+    setSalvando(false);
   }
+}
 
   function editarSolicitacao(s) {
     setIdEmEdicao(s.id);
