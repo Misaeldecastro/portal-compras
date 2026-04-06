@@ -6,6 +6,11 @@ import {
 import { auth } from "./firebase";
 import logo from "./assets/logo.png";
 import "./App.css";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
+} from "firebase/auth";
 
 function Login({ onLogin }) {
   const [tela, setTela] = useState("login");
@@ -46,6 +51,7 @@ async function cadastrar(e) {
 
   try {
     await createUserWithEmailAndPassword(auth, email, senha);
+    await signOut(auth);
     alert("Conta criada! Agora faça login.");
     setTela("login");
     setEmail("");
