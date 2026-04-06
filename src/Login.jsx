@@ -2,15 +2,11 @@ import { useState } from "react";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signOut
 } from "firebase/auth";
 import { auth } from "./firebase";
 import logo from "./assets/logo.png";
 import "./App.css";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut
-} from "firebase/auth";
 
 function Login({ onLogin }) {
   const [tela, setTela] = useState("login");
