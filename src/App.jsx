@@ -102,11 +102,14 @@ function App() {
       dadosTratados.sort((a, b) => b.dataCriacaoTs - a.dataCriacaoTs);
       setSolicitacoes(dadosTratados);
     } catch (error) {
-      console.error("Erro ao buscar:", error);
-      alert("Erro ao buscar solicitações");
+    console.error("Erro ao buscar:", error);
+
+    if (!auth.currentUser) return;
+
+    alert("Erro ao buscar solicitações");
     } finally {
-      setCarregando(false);
-    }
+    setCarregando(false);
+  }
   }
 
   function alterarFormulario(e) {
