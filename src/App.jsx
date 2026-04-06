@@ -20,7 +20,7 @@ const formularioInicial = {
   solicitante: "",
   departamento: "",
   item: "",
-  quantidade: 1,
+  quantidade: "",
   prioridade: "Média",
   linkProduto1: "",
   linkProduto2: "",
@@ -161,8 +161,10 @@ function App() {
           data_criacao: serverTimestamp(),
         });
 
+        const API_URL = import.meta.env.VITE_API_URL;
+
         try {
-          const respostaSlack = await fetch("/api/slack", {
+          const respostaSlack = await fetch("https://portal-compras-five.vercel.app/api/slack", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -367,8 +369,6 @@ function App() {
 
                 <input
                   name="quantidade"
-                  type="number"
-                  min="1"
                   placeholder="Quantidade"
                   value={formulario.quantidade}
                   onChange={alterarFormulario}
