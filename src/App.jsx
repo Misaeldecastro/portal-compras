@@ -47,11 +47,14 @@ function App() {
   const [formulario, setFormulario] = useState(formularioInicial);
 
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
     const cadastroEmAndamento =
       sessionStorage.getItem("cadastroEmAndamento") === "true";
 
     if (cadastroEmAndamento) {
+      if (user) {
+        await signOut(auth);
+      }
       setUsuario(null);
       setCarregando(false);
       return;
