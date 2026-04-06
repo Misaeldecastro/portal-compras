@@ -37,31 +37,31 @@ function App() {
 
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
-  const [filtroUrgencia, setFiltroUrgencia] = useState("Todas");
+  const [filtroPrioridade, setFiltroPrioridade] = useState("Todas");
   const [filtroDepartamento, setFiltroDepartamento] = useState("Todos");
   const [idEmEdicao, setIdEmEdicao] = useState(null);
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    const cadastroEmAndamento =
-      sessionStorage.getItem("cadastroEmAndamento") === "true";
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const cadastroEmAndamento =
+        sessionStorage.getItem("cadastroEmAndamento") === "true";
 
-    if (cadastroEmAndamento) {
-      if (user) {
-        await signOut(auth);
+      if (cadastroEmAndamento) {
+        if (user) {
+          await signOut(auth);
+        }
+        setUsuario(null);
+        setCarregando(false);
+        return;
       }
-      setUsuario(null);
+
+      setUsuario(user || null);
       setCarregando(false);
-      return;
-    }
+    });
 
-    setUsuario(user || null);
-    setCarregando(false);
-  });
-
-  return () => unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -88,35 +88,35 @@ function App() {
           item.data_criacao?.toDate ? item.data_criacao.toDate() : null;
 
         return {
-        id: d.id,
-        solicitante: item.solicitante,
-        departamento: item.departamento,
-        item: item.item,
-        quantidade: item.quantidade,
-        prioridade: item.prioridade,
-        linkProduto1: item.link_produto_1 || "",
-        linkProduto2: item.link_produto_2 || "",
-        data: item.data || "",
-        justificativa: item.justificativa,
-        status: item.status,
-        dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
-        dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
-        motivoReprovacao: item.motivo_reprovacao || "",
-        userEmail: item.user_email || "",
+          id: d.id,
+          solicitante: item.solicitante || "",
+          departamento: item.departamento || "",
+          item: item.item || "",
+          quantidade: item.quantidade || 0,
+          prioridade: item.prioridade || "Média",
+          linkProduto1: item.link_produto_1 || "",
+          linkProduto2: item.link_produto_2 || "",
+          data: item.data || "",
+          justificativa: item.justificativa || "",
+          status: item.status || "Pendente",
+          dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
+          dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
+          motivoReprovacao: item.motivo_reprovacao || "",
+          userEmail: item.user_email || "",
         };
       });
 
       dadosTratados.sort((a, b) => b.dataCriacaoTs - a.dataCriacaoTs);
       setSolicitacoes(dadosTratados);
     } catch (error) {
-    console.error("Erro ao buscar:", error);
+      console.error("Erro ao buscar:", error);
 
-    if (!auth.currentUser) return;
+      if (!auth.currentUser) return;
 
-    alert("Erro ao buscar solicitações");
+      alert("Erro ao buscar solicitações");
     } finally {
-    setCarregando(false);
-  }
+      setCarregando(false);
+    }
   }
 
   function alterarFormulario(e) {
@@ -130,79 +130,80 @@ function App() {
   }
 
   async function enviarSolicitacao(e) {
-  e.preventDefault();
-  if (!usuario) return alert("Você precisa estar logado.");
+    e.preventDefault();
+    if (!usuario) return alert("Você precisa estar logado.");
 
-  setSalvando(true);
+    setSalvando(true);
 
-  const payload = {
-  solicitante: formulario.solicitante,
-  departamento: formulario.departamento,
-  item: formulario.item,
-  quantidade: Number(formulario.quantidade),
-  prioridade: formulario.prioridade,
-  link_produto_1: formulario.linkProduto1,
-  link_produto_2: formulario.linkProduto2 || "",
-  data: formulario.data || null,
-  justificativa: formulario.justificativa,
-  };
+    const payload = {
+      solicitante: formulario.solicitante,
+      departamento: formulario.departamento,
+      item: formulario.item,
+      quantidade: Number(formulario.quantidade),
+      prioridade: formulario.prioridade,
+      link_produto_1: formulario.linkProduto1,
+      link_produto_2: formulario.linkProduto2 || "",
+      data: formulario.data || null,
+      justificativa: formulario.justificativa,
+    };
 
-  try {
-    if (idEmEdicao) {
-      await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
-      alert("Solicitação atualizada com sucesso!");
-    } else {
-      await addDoc(collection(db, "purchase_requests"), {
-        ...payload,
-        status: "Pendente",
-        motivo_reprovacao: "",
-        user_id: usuario.uid,
-        user_email: usuario.email,
-        data_criacao: serverTimestamp(),
+    try {
+      if (idEmEdicao) {
+        await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
+        alert("Solicitação atualizada com sucesso!");
+      } else {
+        await addDoc(collection(db, "purchase_requests"), {
+          ...payload,
+          status: "Pendente",
+          motivo_reprovacao: "",
+          user_id: usuario.uid,
+          user_email: usuario.email,
+          data_criacao: serverTimestamp(),
         });
 
-      try {
-        const respostaSlack = await fetch("/api/slack", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-          solicitante: formulario.solicitante,
-          departamento: formulario.departamento,
-          item: formulario.item,
-          quantidade: Number(formulario.quantidade),
-          prioridade: formulario.prioridade,
-          linkProduto1: formulario.linkProduto1,
-          linkProduto2: formulario.linkProduto2 || "",
-          data: formulario.data || "",
-          justificativa: formulario.justificativa,
-          usuarioEmail: usuario.email,
-}),
-        });
+        try {
+          const respostaSlack = await fetch("/api/slack", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              solicitante: formulario.solicitante,
+              departamento: formulario.departamento,
+              item: formulario.item,
+              quantidade: Number(formulario.quantidade),
+              prioridade: formulario.prioridade,
+              linkProduto1: formulario.linkProduto1,
+              linkProduto2: formulario.linkProduto2 || "",
+              data: formulario.data || "",
+              justificativa: formulario.justificativa,
+            }),
+          });
 
-        if (!respostaSlack.ok) {
-          const erroSlack = await respostaSlack.json().catch(() => ({}));
-          console.error("Erro ao enviar para o Slack:", erroSlack);
+          if (!respostaSlack.ok) {
+            const erroSlack = await respostaSlack.json().catch(() => ({}));
+            console.error("Erro ao enviar para o Slack:", erroSlack);
+          }
+        } catch (erroSlack) {
+          console.error("Erro ao chamar /api/slack:", erroSlack);
         }
-      } catch (erroSlack) {
-        console.error("Erro ao chamar /api/slack:", erroSlack);
+
+        alert("Salvo com sucesso!");
       }
 
-      alert("Salvo com sucesso!");
+      limparFormulario();
+      await buscarSolicitacoes();
+      setPaginaAtiva("minhas");
+    } catch (error) {
+      alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
+      console.error(error);
+    } finally {
+      setSalvando(false);
     }
-
-    limparFormulario();
-    await buscarSolicitacoes();
-    setPaginaAtiva("minhas");
-  } catch (error) {
-    alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
-    console.error(error);
-  } finally {
-    setSalvando(false);
   }
-}
 
+  function editarSolicitacao(s) {
+    setIdEmEdicao(s.id);
     setFormulario({
       solicitante: s.solicitante,
       departamento: s.departamento,
@@ -213,7 +214,10 @@ function App() {
       linkProduto2: s.linkProduto2,
       data: s.data,
       justificativa: s.justificativa,
-      });
+    });
+    setPaginaAtiva("nova");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function excluirSolicitacao(id) {
     if (!window.confirm("Tem certeza que deseja excluir esta solicitação?")) return;
@@ -253,18 +257,17 @@ function App() {
       const bateBusca =
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto) ||
-        s.centroCusto.toLowerCase().includes(texto) ||
-        (s.fornecedor || "").toLowerCase().includes(texto);
+        s.item.toLowerCase().includes(texto);
 
       const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
-      const bateUrgencia = filtroUrgencia === "Todas" || s.urgencia === filtroUrgencia;
+      const batePrioridade =
+        filtroPrioridade === "Todas" || s.prioridade === filtroPrioridade;
       const bateDepartamento =
         filtroDepartamento === "Todos" || s.departamento === filtroDepartamento;
 
-      return bateBusca && bateStatus && bateUrgencia && bateDepartamento;
+      return bateBusca && bateStatus && batePrioridade && bateDepartamento;
     });
-  }, [solicitacoes, busca, filtroStatus, filtroUrgencia, filtroDepartamento]);
+  }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
 
   const departamentosUnicos = useMemo(
     () => [...new Set(solicitacoes.map((s) => s.departamento).filter(Boolean))],
@@ -331,79 +334,80 @@ function App() {
               <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
               <form onSubmit={enviarSolicitacao} className="formulario">
                 <input
-                name="solicitante"
-                placeholder="Solicitante"
-                value={formulario.solicitante}
-                onChange={alterarFormulario}
-                required
+                  name="solicitante"
+                  placeholder="Solicitante"
+                  value={formulario.solicitante}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <input
-                name="departamento"
-                placeholder="Departamento"
-                value={formulario.departamento}
-                onChange={alterarFormulario}
-                required
+                  name="departamento"
+                  placeholder="Departamento"
+                  value={formulario.departamento}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <input
-                name="item"
-                placeholder="Item solicitado"
-                value={formulario.item}
-                onChange={alterarFormulario}
-                required
+                  name="item"
+                  placeholder="Item solicitado"
+                  value={formulario.item}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <input
-                name="quantidade"
-                type="number"
-                min="1"
-                placeholder="Quantidade"
-                value={formulario.quantidade}
-                onChange={alterarFormulario}
-                required
+                  name="quantidade"
+                  type="number"
+                  min="1"
+                  placeholder="Quantidade"
+                  value={formulario.quantidade}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <select
-                name="prioridade"
-                value={formulario.prioridade}
-                onChange={alterarFormulario}
+                  name="prioridade"
+                  value={formulario.prioridade}
+                  onChange={alterarFormulario}
                 >
-                <option>Alta</option>
-                <option>Média</option>
-                <option>Baixa</option>
+                  <option>Alta</option>
+                  <option>Média</option>
+                  <option>Baixa</option>
                 </select>
 
                 <input
-                name="linkProduto1"
-                placeholder="Link do produto 1"
-                value={formulario.linkProduto1}
-                onChange={alterarFormulario}
-                required
+                  name="linkProduto1"
+                  placeholder="Link do produto 1"
+                  value={formulario.linkProduto1}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <input
-                name="linkProduto2"
-                placeholder="Link do produto 2 (opcional)"
-                value={formulario.linkProduto2}
-                onChange={alterarFormulario}
+                  name="linkProduto2"
+                  placeholder="Link do produto 2 (opcional)"
+                  value={formulario.linkProduto2}
+                  onChange={alterarFormulario}
                 />
 
                 <input
-                name="data"
-                type="date"
-                value={formulario.data}
-                onChange={alterarFormulario}
-                required
+                  name="data"
+                  type="date"
+                  value={formulario.data}
+                  onChange={alterarFormulario}
+                  required
                 />
 
                 <textarea
-                name="justificativa"
-                placeholder="Justificativa"
-                value={formulario.justificativa}
-                onChange={alterarFormulario}
-                required
+                  name="justificativa"
+                  placeholder="Justificativa"
+                  value={formulario.justificativa}
+                  onChange={alterarFormulario}
+                  required
                 />
+
                 <div className="acoes-formulario">
                   <button type="submit" disabled={salvando}>
                     {salvando ? "Salvando..." : idEmEdicao ? "Salvar edição" : "Enviar solicitação"}
@@ -424,18 +428,31 @@ function App() {
 
               <div className="filtros filtros-4">
                 <input
-                  placeholder="Buscar por solicitante, departamento, item, centro de custo ou fornecedor"
+                  placeholder="Buscar por solicitante, departamento ou item"
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                 />
                 <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
-                  <option>Todos</option><option>Pendente</option><option>Em análise</option>
-                  <option>Aprovada</option><option>Reprovada</option><option>Comprado</option>
+                  <option>Todos</option>
+                  <option>Pendente</option>
+                  <option>Em análise</option>
+                  <option>Aprovada</option>
+                  <option>Reprovada</option>
+                  <option>Comprado</option>
                 </select>
-                <select value={filtroUrgencia} onChange={(e) => setFiltroUrgencia(e.target.value)}>
-                  <option>Todas</option><option>Alta</option><option>Média</option><option>Baixa</option>
+                <select
+                  value={filtroPrioridade}
+                  onChange={(e) => setFiltroPrioridade(e.target.value)}
+                >
+                  <option>Todas</option>
+                  <option>Alta</option>
+                  <option>Média</option>
+                  <option>Baixa</option>
                 </select>
-                <select value={filtroDepartamento} onChange={(e) => setFiltroDepartamento(e.target.value)}>
+                <select
+                  value={filtroDepartamento}
+                  onChange={(e) => setFiltroDepartamento(e.target.value)}
+                >
                   <option>Todos</option>
                   {departamentosUnicos.map((dep) => (
                     <option key={dep} value={dep}>{dep}</option>
@@ -452,23 +469,23 @@ function App() {
                       <h3>{s.item}</h3>
                       <p><strong>Solicitante:</strong> {s.solicitante}</p>
                       <p><strong>Departamento:</strong> {s.departamento}</p>
-                      <p><strong>Item:</strong> {s.item}</p>
                       <p><strong>Quantidade:</strong> {s.quantidade}</p>
                       <p><strong>Prioridade:</strong> {s.prioridade}</p>
+                      <p><strong>Status:</strong> {s.status}</p>
                       <p><strong>Usuário:</strong> {s.userEmail || "-"}</p>
 
                       <p>
-                      <strong>Link do produto 1:</strong>{" "}
-                      {s.linkProduto1 ? (
-                      <a href={s.linkProduto1} target="_blank" rel="noreferrer">Abrir link</a>
-                      ) : "-"}
+                        <strong>Link do produto 1:</strong>{" "}
+                        {s.linkProduto1 ? (
+                          <a href={s.linkProduto1} target="_blank" rel="noreferrer">Abrir link</a>
+                        ) : "-"}
                       </p>
 
                       <p>
-                      <strong>Link do produto 2:</strong>{" "}
-                      {s.linkProduto2 ? (
-                      <a href={s.linkProduto2} target="_blank" rel="noreferrer">Abrir link</a>
-                      ) : "-"}
+                        <strong>Link do produto 2:</strong>{" "}
+                        {s.linkProduto2 ? (
+                          <a href={s.linkProduto2} target="_blank" rel="noreferrer">Abrir link</a>
+                        ) : "-"}
                       </p>
 
                       <p><strong>Data:</strong> {s.data || "-"}</p>
