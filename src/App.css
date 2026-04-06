@@ -22,14 +22,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  margin-top: 80px;
   margin-bottom: 24px;
   text-align: center;
 }
 
 .login-logo-top img {
-  width: 120px;
+  width: 200px;
   height: auto;
-  margin-bottom: 16px;
+  margin-bottom: 05px;
 }
 
 .mensagem-boas-vindas {
@@ -42,7 +43,8 @@
 }
 
 .logo-sidebar {
-  width: 140px;
+  width: 190px;
+  height: auto;
   margin-bottom: 20px;
 }
 

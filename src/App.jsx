@@ -333,6 +333,14 @@ function App() {
             <div className="bloco">
               <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
               <form onSubmit={enviarSolicitacao} className="formulario">
+                <textarea
+                  name="justificativa"
+                  placeholder="Justificativa/ Descrição"
+                  value={formulario.justificativa}
+                  onChange={alterarFormulario}
+                  required
+                />
+
                 <input
                   name="solicitante"
                   placeholder="Solicitante"
@@ -372,9 +380,9 @@ function App() {
                   value={formulario.prioridade}
                   onChange={alterarFormulario}
                 >
-                  <option>Alta</option>
-                  <option>Média</option>
-                  <option>Baixa</option>
+                  <option>Prioridade Alta</option>
+                  <option>Prioridade Média</option>
+                  <option>Prioridade Baixa</option>
                 </select>
 
                 <input
@@ -400,13 +408,6 @@ function App() {
                   required
                 />
 
-                <textarea
-                  name="justificativa"
-                  placeholder="Justificativa"
-                  value={formulario.justificativa}
-                  onChange={alterarFormulario}
-                  required
-                />
 
                 <div className="acoes-formulario">
                   <button type="submit" disabled={salvando}>
