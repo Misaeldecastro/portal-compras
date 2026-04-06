@@ -47,11 +47,21 @@ function App() {
   const [formulario, setFormulario] = useState(formularioInicial);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUsuario(user || null);
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const cadastroEmAndamento =
+      sessionStorage.getItem("cadastroEmAndamento") === "true";
+
+    if (cadastroEmAndamento) {
+      setUsuario(null);
       setCarregando(false);
-    });
-    return () => unsubscribe();
+      return;
+    }
+
+    setUsuario(user || null);
+    setCarregando(false);
+  });
+
+  return () => unsubscribe();
   }, []);
 
   useEffect(() => {
