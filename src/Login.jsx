@@ -54,8 +54,8 @@ async function cadastrar(e) {
     setSenha("");
     setConfirmarSenha("");
   } catch (error) {
-    console.error("Erro cadastro:", error);
-    alert("Erro ao criar conta");
+  console.error("Erro cadastro:", error);
+  alert(`${error.code} - ${error.message}`);
   } finally {
     setCarregando(false);
   }
