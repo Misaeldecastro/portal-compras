@@ -5,20 +5,16 @@ export default async function handler(req, res) {
 
   try {
     const {
-      solicitante,
-      departamento,
-      centroCusto,
-      item,
-      quantidade,
-      valor,
-      urgencia,
-      fornecedor,
-      linkProduto,
-      prazoNecessario,
-      justificativa,
-      observacoes,
-      usuarioEmail,
-    } = req.body || {};
+        solicitante,
+        departamento,
+        item,
+        quantidade,
+        prioridade,
+        linkProduto1,
+        linkProduto2,
+        data,
+        justificativa,
+        } = req.body || {};
 
     const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
@@ -27,20 +23,16 @@ export default async function handler(req, res) {
     }
 
     const mensagem =
-      `📦 *Nova solicitação de compra*\n` +
-      `👤 *Usuário:* ${usuarioEmail || "-"}\n` +
-      `📝 *Solicitante:* ${solicitante || "-"}\n` +
-      `🏢 *Departamento:* ${departamento || "-"}\n` +
-      `💰 *Centro de custo:* ${centroCusto || "-"}\n` +
-      `🛒 *Item:* ${item || "-"}\n` +
-      `🔢 *Quantidade:* ${quantidade || "-"}\n` +
-      `💵 *Valor:* R$ ${valor || "-"}\n` +
-      `⚡ *Urgência:* ${urgencia || "-"}\n` +
-      `🏪 *Fornecedor:* ${fornecedor || "-"}\n` +
-      `🔗 *Link do produto:* ${linkProduto || "-"}\n` +
-      `📅 *Prazo necessário:* ${prazoNecessario || "-"}\n` +
-      `📄 *Justificativa:* ${justificativa || "-"}\n` +
-      `🗒️ *Observações:* ${observacoes || "-"}`;
+       `📦 *Nova solicitação de compra*\n` +
+       `📝 *Solicitante:* ${solicitante || "-"}\n` +
+       `🏢 *Departamento:* ${departamento || "-"}\n` +
+       `🛒 *Item:* ${item || "-"}\n` +
+       `🔢 *Quantidade:* ${quantidade || "-"}\n` +
+       `⚡ *Prioridade:* ${prioridade || "-"}\n` +
+       `🔗 *Link do produto 1:* ${linkProduto1 || "-"}\n` +
+       `🔗 *Link do produto 2:* ${linkProduto2 || "-"}\n` +
+       `📅 *Data:* ${data || "-"}\n` +
+       `📄 *Justificativa:* ${justificativa || "-"}`;
 
     const slackResponse = await fetch(webhookUrl, {
       method: "POST",

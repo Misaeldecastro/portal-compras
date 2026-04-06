@@ -19,16 +19,13 @@ import logo from "./assets/logo.png";
 const formularioInicial = {
   solicitante: "",
   departamento: "",
-  centroCusto: "",
   item: "",
   quantidade: 1,
-  valor: "",
-  urgencia: "Média",
-  fornecedor: "",
-  linkProduto: "",
-  prazoNecessario: "",
+  prioridade: "Média",
+  linkProduto1: "",
+  linkProduto2: "",
+  data: "",
   justificativa: "",
-  observacoes: "",
 };
 
 function App() {
@@ -91,24 +88,21 @@ function App() {
           item.data_criacao?.toDate ? item.data_criacao.toDate() : null;
 
         return {
-          id: d.id,
-          solicitante: item.solicitante,
-          departamento: item.departamento,
-          centroCusto: item.centro_custo,
-          item: item.item,
-          quantidade: item.quantidade,
-          valor: item.valor,
-          urgencia: item.urgencia,
-          status: item.status,
-          fornecedor: item.fornecedor || "",
-          linkProduto: item.link_produto || "",
-          prazoNecessario: item.prazo_necessario || "",
-          justificativa: item.justificativa,
-          observacoes: item.observacoes || "",
-          dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
-          dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
-          motivoReprovacao: item.motivo_reprovacao || "",
-          userEmail: item.user_email || "",
+        id: d.id,
+        solicitante: item.solicitante,
+        departamento: item.departamento,
+        item: item.item,
+        quantidade: item.quantidade,
+        prioridade: item.prioridade,
+        linkProduto1: item.link_produto_1 || "",
+        linkProduto2: item.link_produto_2 || "",
+        data: item.data || "",
+        justificativa: item.justificativa,
+        status: item.status,
+        dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
+        dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
+        motivoReprovacao: item.motivo_reprovacao || "",
+        userEmail: item.user_email || "",
         };
       });
 
@@ -142,18 +136,15 @@ function App() {
   setSalvando(true);
 
   const payload = {
-    solicitante: formulario.solicitante,
-    departamento: formulario.departamento,
-    centro_custo: formulario.centroCusto,
-    item: formulario.item,
-    quantidade: Number(formulario.quantidade),
-    valor: Number(formulario.valor),
-    urgencia: formulario.urgencia,
-    fornecedor: formulario.fornecedor,
-    link_produto: formulario.linkProduto,
-    prazo_necessario: formulario.prazoNecessario || null,
-    justificativa: formulario.justificativa,
-    observacoes: formulario.observacoes,
+  solicitante: formulario.solicitante,
+  departamento: formulario.departamento,
+  item: formulario.item,
+  quantidade: Number(formulario.quantidade),
+  prioridade: formulario.prioridade,
+  link_produto_1: formulario.linkProduto1,
+  link_produto_2: formulario.linkProduto2 || "",
+  data: formulario.data || null,
+  justificativa: formulario.justificativa,
   };
 
   try {
@@ -168,7 +159,7 @@ function App() {
         user_id: usuario.uid,
         user_email: usuario.email,
         data_criacao: serverTimestamp(),
-      });
+        });
 
       try {
         const respostaSlack = await fetch("/api/slack", {
@@ -177,20 +168,17 @@ function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            solicitante: formulario.solicitante,
-            departamento: formulario.departamento,
-            centroCusto: formulario.centroCusto,
-            item: formulario.item,
-            quantidade: Number(formulario.quantidade),
-            valor: Number(formulario.valor),
-            urgencia: formulario.urgencia,
-            fornecedor: formulario.fornecedor,
-            linkProduto: formulario.linkProduto,
-            prazoNecessario: formulario.prazoNecessario || "",
-            justificativa: formulario.justificativa,
-            observacoes: formulario.observacoes,
-            usuarioEmail: usuario.email,
-          }),
+          solicitante: formulario.solicitante,
+          departamento: formulario.departamento,
+          item: formulario.item,
+          quantidade: Number(formulario.quantidade),
+          prioridade: formulario.prioridade,
+          linkProduto1: formulario.linkProduto1,
+          linkProduto2: formulario.linkProduto2 || "",
+          data: formulario.data || "",
+          justificativa: formulario.justificativa,
+          usuarioEmail: usuario.email,
+}),
         });
 
         if (!respostaSlack.ok) {
@@ -215,25 +203,17 @@ function App() {
   }
 }
 
-  function editarSolicitacao(s) {
-    setIdEmEdicao(s.id);
     setFormulario({
       solicitante: s.solicitante,
       departamento: s.departamento,
-      centroCusto: s.centroCusto,
       item: s.item,
       quantidade: s.quantidade,
-      valor: s.valor,
-      urgencia: s.urgencia,
-      fornecedor: s.fornecedor,
-      linkProduto: s.linkProduto,
-      prazoNecessario: s.prazoNecessario,
+      prioridade: s.prioridade,
+      linkProduto1: s.linkProduto1,
+      linkProduto2: s.linkProduto2,
+      data: s.data,
       justificativa: s.justificativa,
-      observacoes: s.observacoes,
-    });
-    setPaginaAtiva("nova");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+      });
 
   async function excluirSolicitacao(id) {
     if (!window.confirm("Tem certeza que deseja excluir esta solicitação?")) return;
@@ -350,21 +330,80 @@ function App() {
             <div className="bloco">
               <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
               <form onSubmit={enviarSolicitacao} className="formulario">
-                <input name="solicitante" placeholder="Solicitante" value={formulario.solicitante} onChange={alterarFormulario} required />
-                <input name="departamento" placeholder="Departamento" value={formulario.departamento} onChange={alterarFormulario} required />
-                <input name="centroCusto" placeholder="Centro de custo" value={formulario.centroCusto} onChange={alterarFormulario} required />
-                <input name="item" placeholder="Item solicitado" value={formulario.item} onChange={alterarFormulario} required />
-                <input name="quantidade" type="number" min="1" value={formulario.quantidade} onChange={alterarFormulario} required />
-                <input name="valor" type="number" min="0" value={formulario.valor} onChange={alterarFormulario} required />
-                <select name="urgencia" value={formulario.urgencia} onChange={alterarFormulario}>
-                  <option>Alta</option><option>Média</option><option>Baixa</option>
-                </select>
-                <input name="fornecedor" placeholder="Fornecedor sugerido" value={formulario.fornecedor} onChange={alterarFormulario} />
-                <input name="linkProduto" placeholder="Link do produto" value={formulario.linkProduto} onChange={alterarFormulario} />
-                <input name="prazoNecessario" type="date" value={formulario.prazoNecessario} onChange={alterarFormulario} />
-                <textarea name="justificativa" placeholder="Justificativa" value={formulario.justificativa} onChange={alterarFormulario} required />
-                <textarea name="observacoes" placeholder="Observações adicionais" value={formulario.observacoes} onChange={alterarFormulario} />
+                <input
+                name="solicitante"
+                placeholder="Solicitante"
+                value={formulario.solicitante}
+                onChange={alterarFormulario}
+                required
+                />
 
+                <input
+                name="departamento"
+                placeholder="Departamento"
+                value={formulario.departamento}
+                onChange={alterarFormulario}
+                required
+                />
+
+                <input
+                name="item"
+                placeholder="Item solicitado"
+                value={formulario.item}
+                onChange={alterarFormulario}
+                required
+                />
+
+                <input
+                name="quantidade"
+                type="number"
+                min="1"
+                placeholder="Quantidade"
+                value={formulario.quantidade}
+                onChange={alterarFormulario}
+                required
+                />
+
+                <select
+                name="prioridade"
+                value={formulario.prioridade}
+                onChange={alterarFormulario}
+                >
+                <option>Alta</option>
+                <option>Média</option>
+                <option>Baixa</option>
+                </select>
+
+                <input
+                name="linkProduto1"
+                placeholder="Link do produto 1"
+                value={formulario.linkProduto1}
+                onChange={alterarFormulario}
+                required
+                />
+
+                <input
+                name="linkProduto2"
+                placeholder="Link do produto 2 (opcional)"
+                value={formulario.linkProduto2}
+                onChange={alterarFormulario}
+                />
+
+                <input
+                name="data"
+                type="date"
+                value={formulario.data}
+                onChange={alterarFormulario}
+                required
+                />
+
+                <textarea
+                name="justificativa"
+                placeholder="Justificativa"
+                value={formulario.justificativa}
+                onChange={alterarFormulario}
+                required
+                />
                 <div className="acoes-formulario">
                   <button type="submit" disabled={salvando}>
                     {salvando ? "Salvando..." : idEmEdicao ? "Salvar edição" : "Enviar solicitação"}
@@ -413,23 +452,28 @@ function App() {
                       <h3>{s.item}</h3>
                       <p><strong>Solicitante:</strong> {s.solicitante}</p>
                       <p><strong>Departamento:</strong> {s.departamento}</p>
-                      <p><strong>Centro de custo:</strong> {s.centroCusto}</p>
+                      <p><strong>Item:</strong> {s.item}</p>
                       <p><strong>Quantidade:</strong> {s.quantidade}</p>
-                      <p><strong>Valor:</strong> R$ {s.valor}</p>
-                      <p><strong>Urgência:</strong> {s.urgencia}</p>
-                      <p><strong>Status:</strong> {s.status}</p>
-                      <p><strong>Fornecedor:</strong> {s.fornecedor || "-"}</p>
+                      <p><strong>Prioridade:</strong> {s.prioridade}</p>
                       <p><strong>Usuário:</strong> {s.userEmail || "-"}</p>
+
                       <p>
-                        <strong>Link do produto:</strong>{" "}
-                        {s.linkProduto ? (
-                          <a href={s.linkProduto} target="_blank" rel="noreferrer">Abrir link</a>
-                        ) : "-"}
+                      <strong>Link do produto 1:</strong>{" "}
+                      {s.linkProduto1 ? (
+                      <a href={s.linkProduto1} target="_blank" rel="noreferrer">Abrir link</a>
+                      ) : "-"}
                       </p>
-                      <p><strong>Prazo necessário:</strong> {s.prazoNecessario || "-"}</p>
+
+                      <p>
+                      <strong>Link do produto 2:</strong>{" "}
+                      {s.linkProduto2 ? (
+                      <a href={s.linkProduto2} target="_blank" rel="noreferrer">Abrir link</a>
+                      ) : "-"}
+                      </p>
+
+                      <p><strong>Data:</strong> {s.data || "-"}</p>
                       <p><strong>Data da solicitação:</strong> {s.dataCriacao}</p>
                       <p><strong>Justificativa:</strong> {s.justificativa}</p>
-                      <p><strong>Observações:</strong> {s.observacoes || "-"}</p>
 
                       {s.motivoReprovacao && (
                         <p><strong>Motivo da reprovação:</strong> {s.motivoReprovacao}</p>
