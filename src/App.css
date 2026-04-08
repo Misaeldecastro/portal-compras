@@ -1,19 +1,22 @@
 :root {
-  --bg: #f1f5f9;
+  --bg: #f7fbfb;
   --surface: #ffffff;
-  --surface-soft: #f8fafc;
+  --surface-soft: #f3f9f9;
 
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
+  --primary: #6ec0be;
+  --primary-dark: #236470;
 
-  --sidebar: #0f172a;
-  --sidebar-hover: #1e293b;
+  --accent: #ea477e;
+  --accent-alt: #ea4774;
 
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #dbe2ea;
+  --sidebar: #236470;
+  --sidebar-hover: rgba(255, 255, 255, 0.12);
 
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --text: #333333;
+  --muted: #888888;
+  --border: #d8e6e6;
+
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 
@@ -30,14 +33,14 @@
 .login-logo-top img {
   width: 200px;
   height: auto;
-  margin-bottom: 05px;
+  margin-bottom: 5px;
 }
 
 .mensagem-boas-vindas {
   max-width: 520px;
   font-size: 18px;
   font-weight: 500;
-  color: #0b1b52;
+  color: var(--primary-dark);
   line-height: 1.5;
   margin: 0;
 }
@@ -61,7 +64,9 @@ body,
 }
 
 body {
-  background: var(--bg);
+  background: 
+  radial-gradient(circle at top, rgba(110, 192, 190, 0.16), transparent)
+  var(--bg);
   color: var(--text);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -79,8 +84,8 @@ body {
   margin: 0 0 28px;
   font-size: 56px;
   line-height: 1;
-  font-weight: 800;
-  color: #0b1736;
+  font-weight: 700;
+  color: var(--primary-dark);
   letter-spacing: -1px;
 }
 
@@ -95,10 +100,10 @@ body {
 .formulario textarea {
   width: 100%;
   padding: 15px 16px;
-  border: 1px solid #cfd8e3;
+  border: 1px solid var(--border);
   border-radius: 12px;
   background: #ffffff;
-  color: #111827;
+  color: var(--text);
   font-size: 16px;
   outline: none;
   transition: 0.2s ease;
@@ -107,31 +112,31 @@ body {
 
 .formulario input::placeholder,
 .formulario textarea::placeholder {
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .formulario input:focus,
 .formulario select:focus,
 .formulario textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 4px rgba(110, 192, 190, 0.18);
 }
 
 .formulario button {
-  background: var(--primary);
+  background: var(--accent);
   color: #ffffff;
   border: none;
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 15px 16px;
   font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   transition: 0.2s ease;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 8px 20px rgba(234, 71, 126, 0.22);
 }
 
 .formulario button:hover {
-  background: var(--primary-dark);
+  background: var(--accent-alt);
   transform: translateY(-1px);
 }
 
@@ -142,7 +147,7 @@ body {
 .container > button:last-child {
   margin-top: 14px;
   background: transparent;
-  color: #0b1736;
+  color: var(--primary-dark);
   border: none;
   font-weight: 700;
   cursor: pointer;
@@ -162,7 +167,7 @@ body {
 }
 
 .sidebar {
-  background: var(--sidebar);
+  background: linear-gradient(180deg, #236470 0%, #1f5a65 100%);
   color: #f8fafc;
   padding: 28px 20px;
 }
@@ -170,7 +175,7 @@ body {
 .logo {
   color: #ffffff;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 22px;
 }
 
@@ -184,15 +189,17 @@ body {
   width: 100%;
   padding: 12px 14px;
   margin-bottom: 12px;
-  border-radius: 12px;
+  border-radius: 9999px;
   background: transparent;
-  color: #dbe4f0;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
   transition: 0.2s ease;
 }
 
 .menu-item:hover,
 .sidebar a.active,
 .sidebar .menu-item.active {
+  transform: translateX(2px);
   background: var(--sidebar-hover);
   color: #ffffff;
 }
@@ -205,19 +212,20 @@ body {
 
 .topbar {
   height: 88px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.85);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  backdrop-filter: blur(8px);
 }
 
 .topbar h1 {
   margin: 0;
   font-size: 44px;
-  font-weight: 800;
-  color: #0b1736;
+  font-weight: 700;
+  color: var(--primary-dark);
   letter-spacing: -1px;
 }
 
@@ -235,36 +243,36 @@ body {
 }
 
 .card {
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 20px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow);
 }
 
 .card h3 {
   margin: 0 0 8px;
   font-size: 22px;
-  color: #1e293b;
+  color: var(--primary-dark);
   font-weight: 700;
 }
 
 .card strong {
   font-size: 38px;
-  color: #0f172a;
-  font-weight: 800;
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* ===== BLOCOS ===== */
 
 .bloco,
 .item-lista {
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 18px;
   margin-bottom: 18px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow);
 }
 
 /* ===== FORMULÁRIOS INTERNOS ===== */
@@ -282,7 +290,7 @@ body {
   border-radius: 10px;
   padding: 12px 14px;
   background: #ffffff;
-  color: #111827;
+  color: var(--text);
   font-size: 15px;
   transition: 0.2s ease;
 }
@@ -297,11 +305,11 @@ body {
 .item-lista textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(110, 192, 190, 0.18);
 }
 
 .item-lista a {
-  color: var(--primary);
+  color: var(--primary-dark);
   font-weight: 600;
   text-decoration: none;
 }
@@ -320,14 +328,19 @@ body {
 
 /* ===== BOTÕES DO SISTEMA ===== */
 
+.botao-sair {
+  background: #d1eaeb !important;
+  color: var(--primary-dark) !important;
+}
+
 .app-shell button,
 .bloco button,
 .item-lista button,
 .topbar button {
-  background: var(--primary);
+  background: var(--accent);
   color: #ffffff;
   border: none;
-  border-radius: 10px;
+  border-radius: 9999px;
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
@@ -338,16 +351,16 @@ body {
 .bloco button:hover,
 .item-lista button:hover,
 .topbar button:hover {
-  background: var(--primary-dark);
+  background: var(--accent-alt);
 }
 
 .botao-secundario {
-  background: #e5e7eb !important;
-  color: #111827 !important;
+  background: #d1eaeb !important;
+  color: var(--primary-dark) !important;
 }
 
 .botao-secundario:hover {
-  background: #d1d5db !important;
+  background: #c3e1e2 !important;
 }
 
 /* ===== RESPONSIVO ===== */
