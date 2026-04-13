@@ -164,7 +164,7 @@ function App() {
         const linkAnalise = `${window.location.origin}/solicitacao/${docRef.id}`;
 
         try {
-          const respostaSlack = await fetch("https://portal-compras-five.vercel.app/api/slack", {
+          const respostaSlack = await fetch("/api/slack", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
