@@ -152,7 +152,7 @@ function App() {
         await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
         alert("Solicitação atualizada com sucesso!");
       } else {
-        await addDoc(collection(db, "purchase_requests"), {
+        const docRef = await addDoc (collection(db, "purchase_requests"), {
           ...payload,
           status: "Pendente",
           motivo_reprovacao: "",
@@ -161,7 +161,7 @@ function App() {
           data_criacao: serverTimestamp(),
         });
 
-        const API_URL = import.meta.env.VITE_API_URL;
+        const linkAnalise = `${window.location.origin}/solicitacao/${docRef.id}`;
 
         try {
           const respostaSlack = await fetch("https://portal-compras-five.vercel.app/api/slack", {
@@ -179,6 +179,8 @@ function App() {
               linkProduto2: formulario.linkProduto2 || "",
               data: formulario.data || "",
               justificativa: formulario.justificativa,
+              idSolicitacao: docRef.id,
+              linkAnalise,
             }),
           });
 

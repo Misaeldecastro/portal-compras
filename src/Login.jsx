@@ -18,6 +18,7 @@ function Login({ onLogin }) {
   async function entrar(e) {
   e.preventDefault();
   setCarregando(true);
+  sessionStorage.removeItem("cadastroEmAndamento");
 
   try {
     const credencial = await signInWithEmailAndPassword(auth, email, senha);
@@ -44,8 +45,10 @@ async function cadastrar(e) {
   }
 
   setCarregando(true);
+  
 
   try {
+    sessionStorage.setItem("cadastroEmAndamento", "true");
     await createUserWithEmailAndPassword(auth, email, senha);
     await signOut(auth);
     alert("Conta criada! Agora faça login.");
@@ -65,7 +68,10 @@ async function cadastrar(e) {
   <>
 
     <div className="login-logo-top">
-      <img src={logo} alt= "oliv-e"/>
+    <img src={logo} alt="oliv-e" />
+    <p className="mensagem-boas-vindas">
+     Bem-vindo ao Portal de Solicitação Interna de Compras da Oliv-e Saúde
+    </p>
     </div>
 
     <div className="container">

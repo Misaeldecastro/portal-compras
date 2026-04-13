@@ -3,6 +3,10 @@ export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
   }
@@ -18,6 +22,8 @@ export default async function handler(req, res) {
       linkProduto2,
       data,
       justificativa,
+      idSolicitacao,
+      linkAnalise,
     } = req.body || {};
 
     const webhookUrl = process.env.SLACK_WEBHOOK_URL;
@@ -28,15 +34,14 @@ export default async function handler(req, res) {
 
     const mensagem =
       `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
+      `*ID:* ${idSolicitacao || "-"}\n` +
       `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
       `*Solicitante:* ${solicitante || "-"}\n` +
       `*Departamento:* ${departamento || "-"}\n` +
       `*Item:* ${item || "-"}\n` +
       `*Quantidade:* ${quantidade || "-"}\n` +
       `*Prioridade:* ${prioridade || "-"}\n` +
-      `*Link do produto 1:* ${linkProduto1 || "-"}\n` +
-      `*Link do produto 2:* ${linkProduto2 || "-"}\n` +
-      `*Data:* ${data || "-"}\n`;
+      `\n*Analisar no portal:* ${linkAnalise || "-"}`;
       
 
     const slackResponse = await fetch(webhookUrl, {
