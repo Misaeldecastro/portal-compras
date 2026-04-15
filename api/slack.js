@@ -33,6 +33,7 @@ export default async function handler(req, res) {
     const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
     if (!webhookUrl) {
+      console.error("SLACK_WEBHOOK_URL está vazia");
       return res.status(500).json({ error: "SLACK_WEBHOOK_URL não configurada" });
     }
 
