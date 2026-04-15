@@ -58,12 +58,40 @@ return (
     }}>
       <h2>Solicitação</h2>
 
-      <p><strong>Justificativa:</strong> {solicitacao.justificativa}</p>
-      <p><strong>Solicitante:</strong> {solicitacao.solicitante}</p>
-      <p><strong>Departamento:</strong> {solicitacao.departamento}</p>
-      <p><strong>Item:</strong> {solicitacao.item}</p>
-      <p><strong>Quantidade:</strong> {solicitacao.quantidade}</p>
-      <p><strong>Prioridade:</strong> {solicitacao.prioridade}</p>
+      <p><strong>Justificativa:</strong> {solicitacao.justificativa || "-"}</p>
+      <p><strong>Solicitante:</strong> {solicitacao.solicitante || "-"}</p>
+      <p><strong>Departamento:</strong> {solicitacao.departamento || "-"}</p>
+      <p><strong>Item:</strong> {solicitacao.item || "-"}</p>
+      <p><strong>Quantidade:</strong> {solicitacao.quantidade || "-"}</p>
+      <p><strong>Prioridade:</strong> {solicitacao.prioridade || "-"}</p>
+
+      <p>
+        <strong>Link do produto 1:</strong>{" "}
+        {solicitacao.link_produto_1 ? (
+          <a
+            href={solicitacao.link_produto_1}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir link
+          </a>
+  ) : "-"}
+</p>
+
+<p>
+        <strong>Link do produto 2:</strong>{" "}
+        {solicitacao.link_produto_2 ? (
+          <a
+            href={solicitacao.link_produto_2}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir link
+          </a>
+  ) : "-"}
+</p>
+
+<p><strong>Prazo:</strong> {solicitacao.data || "-"}</p>
 
       <div style={{ marginTop: 20 }}>
         <button onClick={aprovar} style={{
