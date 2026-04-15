@@ -1,8 +1,8 @@
 export default async function handler(req, res) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -12,6 +12,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log("API /api/slack foi chamada");
+    console.log("BODY RECEBIDO:", req.body);
+    console.log("WEBHOOK CONFIGURADO?", !!process.env.SLACK_WEBHOOK_URL);
+
     const {
       solicitante,
       departamento,
@@ -33,7 +37,6 @@ export default async function handler(req, res) {
     }
 
     const mensagem =
-      `*TESTE NOVO BACKEND 999*\n\n`
       `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
       `*ID:* ${idSolicitacao || "-"}\n` +
       `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
@@ -43,7 +46,6 @@ export default async function handler(req, res) {
       `*Quantidade:* ${quantidade || "-"}\n` +
       `*Prioridade:* ${prioridade || "-"}\n` +
       `\n*Analisar no portal:* ${linkAnalise || "-"}`;
-      
 
     const slackResponse = await fetch(webhookUrl, {
       method: "POST",
@@ -55,14 +57,19 @@ export default async function handler(req, res) {
 
     if (!slackResponse.ok) {
       const erroTexto = await slackResponse.text();
+      console.error("Erro retornado pelo Slack:", erroTexto);
+
       return res.status(500).json({
         error: "Erro ao enviar mensagem para o Slack",
         details: erroTexto,
       });
     }
 
+    console.log("Mensagem enviada com sucesso ao Slack");
     return res.status(200).json({ ok: true });
   } catch (error) {
+    console.error("ERRO NA API /api/slack:", error);
+
     return res.status(500).json({
       error: "Erro interno",
       details: error.message,

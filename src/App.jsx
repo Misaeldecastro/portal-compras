@@ -184,10 +184,10 @@ function App() {
             }),
           });
 
-          if (!respostaSlack.ok) {
-            const erroSlack = await respostaSlack.json().catch(() => ({}));
-            console.error("Erro ao enviar para o Slack:", erroSlack);
-          }
+        if (!respostaSlack.ok) {
+          const erroTexto = await respostaSlack.text();
+          console.error("Erro ao enviar para o Slack:", erroTexto);
+        }
         } catch (erroSlack) {
           console.error("Erro ao chamar /api/slack:", erroSlack);
         }
