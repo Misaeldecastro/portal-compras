@@ -41,9 +41,22 @@ export default function SolicitacaoDetalhe() {
 
   if (!solicitacao) return <p>Carregando...</p>;
 
-  return (
-    <div style={{ padding: 20 }}>
-      <h1>Solicitação</h1>
+return (
+  <div style={{
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100vh",
+    background: "#f5f5f5"
+  }}>
+    <div style={{
+      background: "#fff",
+      padding: 30,
+      borderRadius: 10,
+      width: "400px",
+      boxShadow: "0 0 10px rgba(0,0,0,0.1)"
+    }}>
+      <h2>Solicitação</h2>
 
       <p><strong>Justificativa:</strong> {solicitacao.justificativa}</p>
       <p><strong>Solicitante:</strong> {solicitacao.solicitante}</p>
@@ -52,10 +65,31 @@ export default function SolicitacaoDetalhe() {
       <p><strong>Quantidade:</strong> {solicitacao.quantidade}</p>
       <p><strong>Prioridade:</strong> {solicitacao.prioridade}</p>
 
-      <button onClick={aprovar}>Aprovar</button>
-      <button onClick={reprovar} style={{ marginLeft: 10 }}>
-        Reprovar
-      </button>
+      <div style={{ marginTop: 20 }}>
+        <button onClick={aprovar} style={{
+          background: "green",
+          color: "#fff",
+          border: "none",
+          padding: "10px 15px",
+          borderRadius: 5,
+          cursor: "pointer"
+        }}>
+          Aprovar
+        </button>
+
+        <button onClick={reprovar} style={{
+          marginLeft: 10,
+          background: "red",
+          color: "#fff",
+          border: "none",
+          padding: "10px 15px",
+          borderRadius: 5,
+          cursor: "pointer"
+        }}>
+          Reprovar
+        </button>
+      </div>
     </div>
-  );
+  </div>
+);
 }
