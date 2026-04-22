@@ -1,14 +1,6 @@
 import { enviarMensagemParaUsuario } from "./slack-utils";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
   }
@@ -22,17 +14,19 @@ export default async function handler(req, res) {
       prioridade,
       justificativa,
       idSolicitacao,
-      linkAnalise,
+      link_produto_1,
+      link_produto_2,
+      data,
     } = req.body || {};
 
-    const lucasId = process.env.SLACK_LUCAS_USER_ID;
+    const joaoId = process.env.SLACK_JOAO_USER_ID;
 
-    if (!lucasId) {
-      return res.status(500).json({ error: "SLACK_LUCAS_USER_ID não configurado" });
+    if (!joaoId) {
+      return res.status(500).json({ error: "SLACK_JOAO_USER_ID não configurado" });
     }
 
     const mensagem =
-      `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
+      `*✅ SOLICITAÇÃO APROVADA*\n\n` +
       `*ID:* ${idSolicitacao || "-"}\n` +
       `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
       `*Solicitante:* ${solicitante || "-"}\n` +
@@ -40,13 +34,16 @@ export default async function handler(req, res) {
       `*Item:* ${item || "-"}\n` +
       `*Quantidade:* ${quantidade || "-"}\n` +
       `*Prioridade:* ${prioridade || "-"}\n` +
-      `\n*Analisar no portal:* ${linkAnalise || "-"}`;
+      `*Link do produto 1:* ${link_produto_1 || "-"}\n` +
+      `*Link do produto 2:* ${link_produto_2 || "-"}\n` +
+      `*Prazo:* ${data || "-"}\n\n` +
+      `_Aprovado por Lucas_`;
 
-    await enviarMensagemParaUsuario(lucasId, mensagem);
+    await enviarMensagemParaUsuario(joaoId, mensagem);
 
     return res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Erro ao enviar para o Lucas:", error);
+    console.error("Erro ao enviar para o João:", error);
     return res.status(500).json({
       error: "Erro interno",
       details: error.message,
