@@ -20,12 +20,37 @@ export default function SolicitacaoDetalhe() {
     buscar();
   }, [id]);
 
-  async function aprovar() {
-    await updateDoc(doc(db, "purchase_requests", id), {
-      status: "Aprovada",
+async function aprovar() {
+  await updateDoc(doc(db, "purchase_requests", id), {
+    status: "Aprovada",
+  });
+
+  const ref = doc(db, "purchase_requests", id);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  try {
+    const resposta = await fetch("/api/slack-aprovado", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...data,
+        idSolicitacao: id,
+      }),
     });
-    alert("Aprovado!");
+
+    if (!resposta.ok) {
+      const erro = await resposta.text();
+      console.error("Erro ao enviar para João:", erro);
+    }
+  } catch (erro) {
+    console.error("Erro na chamada /api/slack-aprovado:", erro);
   }
+
+  alert("Aprovado e enviado para o João!");
+}
 
   async function reprovar() {
     const motivo = prompt("Motivo da reprovação:");
