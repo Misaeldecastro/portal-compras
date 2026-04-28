@@ -31,6 +31,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "SLACK_LUCAS_USER_ID não configurado" });
     }
 
+    const linkPortal = "https://portal-compras-five.vercel.app/";
+
     const mensagem =
       `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
       `*ID:* ${idSolicitacao || "-"}\n` +
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
       `*Item:* ${item || "-"}\n` +
       `*Quantidade:* ${quantidade || "-"}\n` +
       `*Prioridade:* ${prioridade || "-"}\n` +
-      `\n*Analisar no portal:* ${linkAnalise || "-"}`;
+      `\n*Acessar portal de solicitações:* ${linkPortal}`;
 
     await enviarMensagemParaUsuario(lucasId, mensagem);
 
