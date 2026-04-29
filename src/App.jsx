@@ -261,6 +261,7 @@ function App() {
     }
 
     let motivo = "";
+
     if (novoStatus === "Reprovada") {
       const r = window.prompt("Digite o motivo da reprovação:");
       if (r === null) return;
@@ -272,6 +273,29 @@ function App() {
         status: novoStatus,
         motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
       });
+
+      if (novoStatus === "Aprovada") {
+        const solicitacao = solicitacoes.find((s) => s.id == id);
+
+
+      if (solicitacao) {
+        const respostaSlack = await fetch("/api/slack-aprovado", {
+          method: "POST",
+          headers: {
+            "Content-type": "application/json",
+          },
+          body: JSON.stringify({
+            ...solicitacao,
+            status: novoStatus,
+          }),
+      });
+
+      if (!respostaSlack.ok) {
+        const erroTexto = await respostaSlack.text();
+        console.error("Erro ao enviar aprovação para slack:", erroTexto);
+      }
+    }
+  }
       await buscarSolicitacoes();
     } catch (error) {
       alert("Erro ao alterar status");

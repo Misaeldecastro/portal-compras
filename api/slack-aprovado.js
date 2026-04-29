@@ -1,52 +1,41 @@
-import { enviarMensagemParaUsuario } from "./slack-utils";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido" });
+    return res.status(405).end();
   }
 
   try {
-    const {
-      solicitante,
-      departamento,
-      item,
-      quantidade,
-      prioridade,
-      justificativa,
-      idSolicitacao,
-      link_produto_1,
-      link_produto_2,
-      data,
-    } = req.body || {};
-
-    const joaoId = process.env.SLACK_JOAO_USER_ID;
-
-    if (!joaoId) {
-      return res.status(500).json({ error: "SLACK_JOAO_USER_ID não configurado" });
-    }
+    const data = req.body;
 
     const mensagem =
-      `*✅ SOLICITAÇÃO APROVADA*\n\n` +
-      `*ID:* ${idSolicitacao || "-"}\n` +
-      `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
-      `*Solicitante:* ${solicitante || "-"}\n` +
-      `*Departamento:* ${departamento || "-"}\n` +
-      `*Item:* ${item || "-"}\n` +
-      `*Quantidade:* ${quantidade || "-"}\n` +
-      `*Prioridade:* ${prioridade || "-"}\n` +
-      `*Link do produto 1:* ${link_produto_1 || "-"}\n` +
-      `*Link do produto 2:* ${link_produto_2 || "-"}\n` +
-      `*Prazo:* ${data || "-"}\n\n` +
-      `_Aprovado por Lucas_`;
+      `*SOLICITAÇÃO APROVADA* ✅\n\n` +
+      `*Item:* ${data.item}\n` +
+      `*Solicitante:* ${data.solicitante}\n` +
+      `*Departamento:* ${data.departamento}\n` +
+      `*Quantidade:* ${data.quantidade}\n` +
+      `*Prioridade:* ${data.prioridade}\n` +
+      `*Data:* ${data.data || "-"}\n` +
+      `*Justificativa:* ${data.justificativa || "-"}\n`;
 
-    await enviarMensagemParaUsuario(joaoId, mensagem);
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: "U0A7NH920UU", //meu id
+        text: mensagem,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
 
     return res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Erro ao enviar para o João:", error);
-    return res.status(500).json({
-      error: "Erro interno",
-      details: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
