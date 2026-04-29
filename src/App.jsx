@@ -467,14 +467,16 @@ function App() {
                   onChange={alterarFormulario}
                 />
 
-                <input
-                  name="data"
-                  type="date"
-                  placeholder="Prazo"
-                  value={formulario.data}
-                  onChange={alterarFormulario}
-                  required
+                <div className="campo-form">
+                  <label>Prazo</label>
+                  <input
+                    name="data"
+                    type="date"
+                    value={formulario.data}
+                    onChange={alterarFormulario}
+                    required
                 />
+                </div>
 
                 <div className="acoes-formulario">
                   <button type="submit" disabled={salvando}>
