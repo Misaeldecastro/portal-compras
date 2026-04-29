@@ -46,8 +46,8 @@ function App() {
 
   const admins = [
     "m.castro@oliv-e.health",
-    "lucas@empresa.com",
-    "joao@empresa.com",
+    "l.andrade@oliv-e.health",
+    "j.furlan@oliv-e.health",
   ];
 
   const isAdmin = usuario?.email && admins.includes(usuario.email);
