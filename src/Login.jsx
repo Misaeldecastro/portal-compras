@@ -2,7 +2,9 @@ import { useState } from "react";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut
+  signOut,
+  setPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import { auth } from "./firebase";
 import logo from "./assets/logo.png";
@@ -21,6 +23,8 @@ function Login({ onLogin }) {
   sessionStorage.removeItem("cadastroEmAndamento");
 
   try {
+    await setPersistence(auth, browserSessionPersistence);
+
     const credencial = await signInWithEmailAndPassword(auth, email, senha);
     onLogin(credencial.user);
   } catch (error) {
