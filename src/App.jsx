@@ -470,6 +470,7 @@ function App() {
                 <input
                   name="data"
                   type="date"
+                  placeholder="Prazo"
                   value={formulario.data}
                   onChange={alterarFormulario}
                   required
