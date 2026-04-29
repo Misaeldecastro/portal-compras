@@ -471,11 +471,11 @@ function App() {
                 <div className="campo-form">
                   <label>Prazo</label>
                   <input
-                    name="data"
-                    type="text"
-                    value={formulario.data}
-                    onChange={alterarFormulario}
-                    required
+                  name="data"
+                  type="date"
+                  value={formulario.data}
+                  onChange={alterarFormulario}
+                  required
                 />
                 </div>
 
