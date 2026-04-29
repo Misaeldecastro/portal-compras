@@ -50,7 +50,9 @@ function App() {
     "j.furlan@oliv-e.health",
   ];
 
-  const isAdmin = usuario?.email && admins.includes(usuario.email);
+  const isAdmin =
+    usuario?.email &&
+    admins.includes(usuario.email.toLowerCase().trim());
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
