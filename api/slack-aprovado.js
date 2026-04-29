@@ -6,8 +6,16 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    const link1 = data.linkProduto1 ? `<${data.linkProduto1}|abrir produto 1>` : "-";
-    const link2 = data.linkProduto2 ? `<${data.linkProduto2}>|abrir produto 2>` : "-";
+    const linkportal = "https://portal-compras-five.vercel.app/";
+    
+    const link1 = data.linkProduto1 
+    ? `<${data.linkProduto1}|abrir produto 1>` 
+    : "-";
+
+    const link2 = data.linkProduto2 
+    ? `<${data.linkProduto2}>|abrir produto 2>` 
+    : "-";
+    
 
     const mensagem =
       `*SOLICITAÇÃO APROVADA* \n\n` +
