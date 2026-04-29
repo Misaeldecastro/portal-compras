@@ -6,15 +6,21 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
+    const link1 = data.linkProduto1 ? `<${data.linkProduto1}|abrir produto 1>` : "-";
+    const link2 = data.linkProduto2 ? `<${data.linkProduto2}>|abrir produto 2>` : "-";
+
     const mensagem =
-      `*SOLICITAÇÃO APROVADA* ✅\n\n` +
+      `*SOLICITAÇÃO APROVADA* \n\n` +
       `*Item:* ${data.item}\n` +
       `*Solicitante:* ${data.solicitante}\n` +
       `*Departamento:* ${data.departamento}\n` +
       `*Quantidade:* ${data.quantidade}\n` +
       `*Prioridade:* ${data.prioridade}\n` +
-      `*Data:* ${data.data || "-"}\n` +
-      `*Justificativa:* ${data.justificativa || "-"}\n`;
+      `*Prazo:* ${data.data || "-"}\n` +
+      `*Link do produto 1:* ${link1}\n`+
+      `*Link do produto 2:* ${link2}\n`+
+      `*Justificativa:* ${data.justificativa || "-"}\n`
+      `\n*portal de solicitações:* ${linkPortal}`;
 
     const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
