@@ -233,6 +233,55 @@ body {
   padding: 24px;
 }
 
+
+.campo-senha {
+  position: relative;
+  width: 100%
+}
+
+.campo-senha input {
+  width: 100%;
+  padding-right: 45px;
+}
+
+.botao-olho {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.botao-olho:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: translateY(-50%) !important;
+}
+
+.link-secundario {
+  margin-top: 05px;
+  font-size: 14px;
+  color: #1f6f78;
+  cursor: pointer;
+  text-align: center;
+}
+
+.link-secundario:hover {
+  text-decoration: underline;
+}
+
+
+
 /* ===== CARDS ===== */
 
 .cards {
