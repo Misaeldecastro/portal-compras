@@ -44,15 +44,13 @@ function App() {
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
-  const admins = [
-    "m.castro@oliv-e.health",
-    "l.andrade@oliv-e.health",
-    "j.furlan@oliv-e.health",
-  ];
+  const emailLogado = usuario?.email?.toLowerCase().trim();
 
-  const isAdmin =
-    usuario?.email &&
-    admins.includes(usuario.email.toLowerCase().trim());
+  const isMisael = emailLogado === "m.castro@oliv-e.health";
+  const isLucas = emailLogado === "l.andrade@oliv-e.health";
+  const isJoao = emailLogado === "j.furlan@oliv-e.health";
+
+  const isAdmin = isMisael || isLucas || isJoao;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -88,18 +86,24 @@ function App() {
     try {
       let q;
 
-      if (isAdmin) {
-        q = query(
-          collection(db, "purchase_requests"),
-          orderBy("data_criacao", "desc")
-        );
-      } else {
-        q = query(
-          collection(db, "purchase_requests"),
-          where("user_id", "==", usuario.uid),
-          orderBy("data_criacao", "desc")
-        );
-      }
+  if (isLucas) {
+    q = query(
+    collection(db, "purchase_requests"),
+    orderBy("data_criacao", "desc")
+  );
+  } else if (isMisael || isJoao) {
+    q = query(
+      collection(db, "purchase_requests"),
+      where("aprovada_lucas", "==", true),
+      orderBy("data_criacao", "desc")
+    );
+  } else {
+    q = query(
+      collection(db, "purchase_requests"),
+      where("user_id", "==", usuario.uid),
+      orderBy("data_criacao", "desc")
+    );
+  }
 
       const snapshot = await getDocs(q);
 
@@ -257,7 +261,13 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
-    if (!isAdmin) {
+   const lucasPodeAlterar = isLucas;
+
+    const misaelOuJoaoPodeAlterar =
+      (isMisael || isJoao) &&
+      (novoStatus === "Comprado" || novoStatus === "Reprovada");
+
+    if (!lucasPodeAlterar && !misaelOuJoaoPodeAlterar) {
       alert("Você não tem permissão para alterar o status.");
       return;
     }
@@ -271,20 +281,29 @@ function App() {
     }
 
     try {
-      await updateDoc(doc(db, "purchase_requests", id), {
-        status: novoStatus,
-        motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
-      });
+      const dadosAtualizacao = {
+      status: novoStatus,
+      motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
+    };
 
-      if (novoStatus === "Aprovada") {
-        const solicitacao = solicitacoes.find((s) => s.id == id);
+    if (novoStatus === "Aprovada" && isLucas) {
+      dadosAtualizacao.aprovada_lucas = true;
+    }
+
+    await updateDoc(
+      doc(db, "purchase_requests", id),
+      dadosAtualizacao
+    );
+
+      if (novoStatus === "Aprovada" && isLucas){
+        const solicitacao = solicitacoes.find((s) => s.id === id);
 
 
       if (solicitacao) {
         const respostaSlack = await fetch("/api/slack-aprovado", {
           method: "POST",
           headers: {
-            "Content-type": "application/json",
+           "Content-Type": "application/json",
           },
           body: JSON.stringify({
             ...solicitacao,
@@ -350,7 +369,13 @@ function App() {
             Nova Solicitação
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
-            {isAdmin ? "Todas as Solicitações" : "Minhas Solicitações"}
+
+      {isLucas
+          ? "Todas as solicitações"
+          : isMisael || isJoao
+          ? "Solicitações aprovadas"
+          : "Minhas solicitações"}
+
           </button>
         </nav>
       </aside>
@@ -508,7 +533,13 @@ function App() {
 
           {paginaAtiva === "minhas" && (
             <div className="bloco">
-              <h2>{isAdmin ? "Todas as solicitações" : "Minhas solicitações"}</h2>
+              <h2>
+               {isLucas
+                ? "Todas as solicitações"
+                : isMisael || isJoao
+                ? "Solicitações aprovadas"
+                : "Minhas solicitações"}
+              </h2>
 
               <div className="filtros filtros-4">
                 <input
@@ -619,36 +650,37 @@ function App() {
                       )}
 
                       <div className="acoes">
-                        <button onClick={() => editarSolicitacao(s)}>
-                          Editar
+                        {isLucas && (
+                          <button onClick={() => editarSolicitacao(s)}>
+                            Editar
                         </button>
-
-                        {isAdmin && (
-                          <>
-                            <button onClick={() => mudarStatus(s.id, "Pendente")}>
-                              Pendente
-                            </button>
-                            <button onClick={() => mudarStatus(s.id, "Em análise")}>
-                              Em análise
-                            </button>
-                            <button onClick={() => mudarStatus(s.id, "Aprovada")}>
-                              Aprovar
-                            </button>
-                            <button onClick={() => mudarStatus(s.id, "Comprado")}>
-                              Comprado
-                            </button>
-                            <button onClick={() => mudarStatus(s.id, "Reprovada")}>
-                              Reprovar
-                            </button>
-                          </>
                         )}
 
-                        <button
+                      {(isLucas) && (
+                        <>
+                        <button onClick={() => mudarStatus(s.id, "Pendente")}>Pendente</button>
+                        <button onClick={() => mudarStatus(s.id, "Em análise")}>Em análise</button>
+                        <button onClick={() => mudarStatus(s.id, "Aprovada")}>Aprovar</button>
+                        <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
+                        <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
+                        </>
+                      )}
+
+                      {(isMisael || isJoao) && (
+                      <>
+                      <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
+                      <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
+                      </>
+                      )}
+
+                        {isLucas && (
+                         <button
                           onClick={() => excluirSolicitacao(s.id)}
                           style={{ background: "#dc2626" }}
                         >
                           Excluir
                         </button>
+                        )}
                       </div>
                     </div>
                   ))}
