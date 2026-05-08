@@ -366,14 +366,14 @@ function App() {
             Dashboard
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("nova")}>
-            Nova Solicitação
+            Fazer uma Solicitação
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
 
       {isLucas
           ? "Todas as solicitações"
           : isMisael || isJoao
-          ? "Solicitações aprovadas"
+          ? "Todas as Solicitações"
           : "Minhas solicitações"}
 
           </button>
