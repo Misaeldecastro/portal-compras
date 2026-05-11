@@ -45,7 +45,6 @@ function App() {
   const [formulario, setFormulario] = useState(formularioInicial);
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
-
   const isMisael = emailLogado === "m.castro@oliv-e.health";
   const isLucas = emailLogado === "l.andrade@oliv-e.health";
   const isJoao = emailLogado === "j.furlan@oliv-e.health";
@@ -91,7 +90,7 @@ function App() {
     collection(db, "purchase_requests"),
     orderBy("data_criacao", "desc")
   );
-  } else if (isMisael || isJoao) {
+  } else if (isJoao) {
     q = query(
       collection(db, "purchase_requests"),
       where("aprovada_lucas", "==", true),
@@ -264,7 +263,7 @@ function App() {
    const lucasPodeAlterar = isLucas;
 
     const misaelOuJoaoPodeAlterar =
-      (isMisael || isJoao) &&
+      (isJoao) &&
       (novoStatus === "Comprado" || novoStatus === "Reprovada");
 
     if (!lucasPodeAlterar && !misaelOuJoaoPodeAlterar) {
@@ -666,7 +665,7 @@ function App() {
                         </>
                       )}
 
-                      {(isMisael || isJoao) && (
+                      {(isJoao) && (
                       <>
                       <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
                       <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
