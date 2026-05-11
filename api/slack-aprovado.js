@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        channel: "U0A7NH920UU", //meu id
+        channel: "U010UDZ4XGD", //meu id
         text: mensagem,
       }),
     });
