@@ -158,7 +158,6 @@ body {
 }
 
 /* ===== APP SHELL ===== */
-
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -324,6 +323,196 @@ body {
   box-shadow: var(--shadow);
 }
 
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item-lista-acordeao {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+  box-shadow: 0 10px 28px rgba(35, 100, 112, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.item-lista-acordeao:hover,
+.item-lista-acordeao.aberto {
+  border-color: rgba(110, 192, 190, 0.75);
+  box-shadow: 0 14px 34px rgba(35, 100, 112, 0.12);
+}
+
+.item-lista-acordeao.aberto {
+  transform: translateY(-1px);
+}
+
+.item-lista-acordeao .titulo-solicitacao {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: linear-gradient(90deg, #ffffff 0%, #f7fbfb 100%);
+  color: var(--primary-dark);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  text-align: left;
+}
+
+.item-lista-acordeao .titulo-solicitacao:hover {
+  background: linear-gradient(90deg, #f8fdfd 0%, #eef8f8 100%);
+  color: var(--primary-dark);
+}
+
+.item-lista-acordeao .titulo-solicitacao:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px rgba(110, 192, 190, 0.28);
+}
+
+.cabecalho-solicitacao {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.nome-solicitacao {
+  min-width: 0;
+  flex: 0 1 auto;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.selo-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.selo-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.selo-status.comprado {
+  background: #e8f8ef;
+  border-color: #b7e4c7;
+  color: #166534;
+}
+
+.selo-status.pendente {
+  background: #fff8db;
+  border-color: #f5df8f;
+  color: #8a5a00;
+}
+
+.selo-status.recusado {
+  background: #fdecec;
+  border-color: #f6b8b8;
+  color: #b42318;
+}
+
+.selo-status.neutro {
+  background: #edf6f7;
+  border-color: #cfe7e8;
+  color: var(--primary-dark);
+}
+
+.titulo-solicitacao::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-right: 2px solid var(--primary-dark);
+  border-bottom: 2px solid var(--primary-dark);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.item-lista-acordeao.aberto .titulo-solicitacao::after {
+  transform: rotate(225deg);
+}
+
+.conteudo-solicitacao {
+  padding: 4px 20px 20px;
+  border-top: 1px solid rgba(216, 230, 230, 0.8);
+  animation: revelarSolicitacao 0.18s ease-out;
+}
+
+.detalhes-solicitacao {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  column-gap: 28px;
+  row-gap: 4px;
+  padding-top: 16px;
+}
+
+.campo-detalhe {
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(216, 230, 230, 0.85);
+}
+
+.campo-detalhe span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.campo-detalhe strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.campo-detalhe-longo {
+  grid-column: 1 / -1;
+}
+
+.item-lista-acordeao .acoes {
+  padding-top: 8px;
+}
+
+@keyframes revelarSolicitacao {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ===== FORMULÁRIOS INTERNOS ===== */
 
 .filtros input,
@@ -419,6 +608,10 @@ body {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 
+  .detalhes-solicitacao {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
   .topbar h1 {
     font-size: 36px;
   }
@@ -448,5 +641,18 @@ body {
 
   .content {
     padding: 18px;
+  }
+
+  .detalhes-solicitacao {
+    grid-template-columns: 1fr;
+  }
+
+  .item-lista-acordeao .titulo-solicitacao {
+    min-height: 58px;
+    padding: 16px;
+  }
+
+  .conteudo-solicitacao {
+    padding: 2px 16px 16px;
   }
 }

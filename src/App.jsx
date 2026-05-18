@@ -41,6 +41,7 @@ function App() {
   const [filtroPrioridade, setFiltroPrioridade] = useState("Todas");
   const [filtroDepartamento, setFiltroDepartamento] = useState("Todos");
   const [idEmEdicao, setIdEmEdicao] = useState(null);
+  const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
@@ -127,10 +128,21 @@ function App() {
           dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
           motivoReprovacao: item.motivo_reprovacao || "",
           userEmail: item.user_email || "",
+          aprovadaLucas: item.aprovada_lucas === true,
+          analiseLucasFinalizada: item.analise_lucas_finalizada === true,
         };
       });
 
-      setSolicitacoes(dadosTratados);
+      setSolicitacoes(
+        isLucas
+          ? dadosTratados.filter(
+              (s) =>
+                !s.aprovadaLucas &&
+                !s.analiseLucasFinalizada &&
+                !["Aprovada", "Reprovada", "Comprado"].includes(s.status)
+            )
+          : dadosTratados
+      );
     } catch (error) {
       console.error("Erro ao buscar:", error);
 
@@ -179,6 +191,7 @@ function App() {
           ...payload,
           status: "Pendente",
           motivo_reprovacao: "",
+          analise_lucas_finalizada: false,
           user_id: usuario.uid,
           user_email: usuario.email,
           data_criacao: serverTimestamp(),
@@ -246,6 +259,25 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function pedirNovamente(s) {
+    setIdEmEdicao(null);
+
+    setFormulario({
+      solicitante: s.solicitante,
+      departamento: s.departamento,
+      item: s.item,
+      quantidade: s.quantidade,
+      prioridade: s.prioridade,
+      linkProduto1: s.linkProduto1,
+      linkProduto2: s.linkProduto2,
+      data: s.data || "",
+      justificativa: s.justificativa,
+    });
+
+    setPaginaAtiva("nova");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function excluirSolicitacao(id) {
     if (!window.confirm("Tem certeza que deseja excluir esta solicitação?")) return;
 
@@ -260,15 +292,32 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
-   const lucasPodeAlterar = isLucas;
+    const lucasPodeAlterar = isLucas;
 
     const misaelOuJoaoPodeAlterar =
-      (isJoao) &&
+      isJoao &&
       (novoStatus === "Comprado" || novoStatus === "Reprovada");
 
     if (!lucasPodeAlterar && !misaelOuJoaoPodeAlterar) {
       alert("Você não tem permissão para alterar o status.");
       return;
+    }
+
+    const analiseFinalizadaLucas =
+      isLucas && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
+    const solicitacaoAtual = solicitacoes.find((s) => s.id === id);
+
+    if (analiseFinalizadaLucas) {
+      const acao = novoStatus === "Aprovada" ? "aprovar" : "reprovar";
+      const nomeSolicitacao = solicitacaoAtual?.item
+        ? ` "${solicitacaoAtual.item}"`
+        : "";
+
+      const confirmado = window.confirm(
+        `Tem certeza que deseja ${acao} esta solicitação${nomeSolicitacao}? Depois disso ela sairá da sua lista.`
+      );
+
+      if (!confirmado) return;
     }
 
     let motivo = "";
@@ -281,41 +330,45 @@ function App() {
 
     try {
       const dadosAtualizacao = {
-      status: novoStatus,
-      motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
-    };
+        status: novoStatus,
+        motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
+      };
 
-    if (novoStatus === "Aprovada" && isLucas) {
-      dadosAtualizacao.aprovada_lucas = true;
-    }
-
-    await updateDoc(
-      doc(db, "purchase_requests", id),
-      dadosAtualizacao
-    );
-
-      if (novoStatus === "Aprovada" && isLucas){
-        const solicitacao = solicitacoes.find((s) => s.id === id);
-
-
-      if (solicitacao) {
-        const respostaSlack = await fetch("/api/slack-aprovado", {
-          method: "POST",
-          headers: {
-           "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...solicitacao,
-            status: novoStatus,
-          }),
-      });
-
-      if (!respostaSlack.ok) {
-        const erroTexto = await respostaSlack.text();
-        console.error("Erro ao enviar aprovação para slack:", erroTexto);
+      if (novoStatus === "Aprovada" && isLucas) {
+        dadosAtualizacao.aprovada_lucas = true;
       }
-    }
-  }
+
+      if (analiseFinalizadaLucas) {
+        dadosAtualizacao.analise_lucas_finalizada = true;
+      }
+
+      await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
+
+      if (analiseFinalizadaLucas) {
+        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
+        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
+      }
+
+      if (novoStatus === "Aprovada" && isLucas) {
+        if (solicitacaoAtual) {
+          const respostaSlack = await fetch("/api/slack-aprovado", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ...solicitacaoAtual,
+              status: novoStatus,
+            }),
+          });
+
+          if (!respostaSlack.ok) {
+            const erroTexto = await respostaSlack.text();
+            console.error("Erro ao enviar aprovação para slack:", erroTexto);
+          }
+        }
+      }
+
       await buscarSolicitacoes();
     } catch (error) {
       alert("Erro ao alterar status");
@@ -368,13 +421,11 @@ function App() {
             Fazer uma Solicitação
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
-
-      {isLucas
-          ? "Todas as solicitações"
-          : isMisael || isJoao
-          ? "Todas as Solicitações"
-          : "Minhas solicitações"}
-
+            {isLucas
+              ? "Todas as solicitações"
+              : isMisael || isJoao
+              ? "Todas as Solicitações"
+              : "Minhas solicitações"}
           </button>
         </nav>
       </aside>
@@ -536,153 +587,201 @@ function App() {
                {isLucas
                 ? "Todas as solicitações"
                 : isMisael || isJoao
-                ? "Solicitações aprovadas"
+                ? "Todas as solicitações"
                 : "Minhas solicitações"}
               </h2>
 
               <div className="filtros filtros-4">
                 <input
-                  placeholder="Buscar por solicitante, departamento ou item"
+                  placeholder="Buscar solicitação"
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                 />
-
-                <select
-                  value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value)}
-                >
-                  <option>Todos</option>
-                  <option>Pendente</option>
-                  <option>Em análise</option>
-                  <option>Aprovada</option>
-                  <option>Reprovada</option>
-                  <option>Comprado</option>
-                </select>
-
-                <select
-                  value={filtroPrioridade}
-                  onChange={(e) => setFiltroPrioridade(e.target.value)}
-                >
-                  <option>Todas</option>
-                  <option>Alta</option>
-                  <option>Média</option>
-                  <option>Baixa</option>
-                </select>
-
-                <select
-                  value={filtroDepartamento}
-                  onChange={(e) => setFiltroDepartamento(e.target.value)}
-                >
-                  <option>Todos</option>
-                  {departamentosUnicos.map((dep) => (
-                    <option key={dep} value={dep}>
-                      {dep}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {carregando ? (
                 <p>Carregando...</p>
               ) : (
                 <div className="lista">
-                  {solicitacoesFiltradas.map((s) => (
-                    <div key={s.id} className="item-lista">
-                      <h3>{s.item}</h3>
+                  {solicitacoesFiltradas.map((s) => {
+                    const estaAberta = solicitacaoAbertaId === s.id;
+                    const statusNormalizado = (s.status || "").toLowerCase();
+                    const statusClasse =
+                      statusNormalizado === "comprado"
+                        ? "comprado"
+                        : statusNormalizado === "pendente"
+                        ? "pendente"
+                        : ["reprovada", "reprovado", "recusada", "recusado"].includes(
+                            statusNormalizado
+                          )
+                        ? "recusado"
+                        : "neutro";
 
-                      <p>
-                        <strong>Solicitante:</strong> {s.solicitante}
-                      </p>
-                      <p>
-                        <strong>Departamento:</strong> {s.departamento}
-                      </p>
-                      <p>
-                        <strong>Quantidade:</strong> {s.quantidade}
-                      </p>
-                      <p>
-                        <strong>Prioridade:</strong> {s.prioridade}
-                      </p>
-                      <p>
-                        <strong>Status:</strong> {s.status}
-                      </p>
-                      <p>
-                        <strong>Usuário:</strong> {s.userEmail || "-"}
-                      </p>
-
-                      <p>
-                        <strong>Link do produto 1:</strong>{" "}
-                        {s.linkProduto1 ? (
-                          <a href={s.linkProduto1} target="_blank" rel="noreferrer">
-                            Abrir link
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </p>
-
-                      <p>
-                        <strong>Link do produto 2:</strong>{" "}
-                        {s.linkProduto2 ? (
-                          <a href={s.linkProduto2} target="_blank" rel="noreferrer">
-                            Abrir link
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </p>
-
-                      <p>
-                        <strong>Data:</strong> {s.data || "-"}
-                      </p>
-                      <p>
-                        <strong>Data da solicitação:</strong> {s.dataCriacao}
-                      </p>
-                      <p>
-                        <strong>Justificativa:</strong> {s.justificativa}
-                      </p>
-
-                      {s.motivoReprovacao && (
-                        <p>
-                          <strong>Motivo da reprovação:</strong>{" "}
-                          {s.motivoReprovacao}
-                        </p>
-                      )}
-
-                      <div className="acoes">
-                        {isLucas && (
-                          <button onClick={() => editarSolicitacao(s)}>
-                            Editar
-                        </button>
-                        )}
-
-                      {(isLucas) && (
-                        <>
-                        <button onClick={() => mudarStatus(s.id, "Pendente")}>Pendente</button>
-                        <button onClick={() => mudarStatus(s.id, "Em análise")}>Em análise</button>
-                        <button onClick={() => mudarStatus(s.id, "Aprovada")}>Aprovar</button>
-                        <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
-                        <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
-                        </>
-                      )}
-
-                      {(isJoao) && (
-                      <>
-                      <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
-                      <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
-                      </>
-                      )}
-
-                        {isLucas && (
-                         <button
-                          onClick={() => excluirSolicitacao(s.id)}
-                          style={{ background: "#dc2626" }}
+                    return (
+                      <article
+                        key={s.id}
+                        className={`item-lista item-lista-acordeao ${
+                          estaAberta ? "aberto" : ""
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          className="titulo-solicitacao"
+                          onClick={() =>
+                            setSolicitacaoAbertaId(estaAberta ? null : s.id)
+                          }
+                          aria-expanded={estaAberta}
+                          aria-controls={`detalhes-${s.id}`}
                         >
-                          Excluir
+                          <span className="cabecalho-solicitacao">
+                            <span className="nome-solicitacao">
+                              {s.item || "Solicitação sem título"}
+                            </span>
+                            <span className={`selo-status ${statusClasse}`}>
+                              {s.status || "Sem status"}
+                            </span>
+                          </span>
                         </button>
+
+                        {estaAberta && (
+                          <div
+                            id={`detalhes-${s.id}`}
+                            className="conteudo-solicitacao"
+                          >
+                            <div className="detalhes-solicitacao">
+                              <div className="campo-detalhe">
+                                <span>Solicitante</span>
+                                <strong>{s.solicitante || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Departamento</span>
+                                <strong>{s.departamento || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Quantidade</span>
+                                <strong>{s.quantidade}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Prioridade</span>
+                                <strong>{s.prioridade || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Status</span>
+                                <strong>{s.status || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Usuário</span>
+                                <strong>{s.userEmail || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Link do produto 1</span>
+                                <strong>
+                                  {s.linkProduto1 ? (
+                                    <a
+                                      href={s.linkProduto1}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      Abrir link
+                                    </a>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Link do produto 2</span>
+                                <strong>
+                                  {s.linkProduto2 ? (
+                                    <a
+                                      href={s.linkProduto2}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      Abrir link
+                                    </a>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Data</span>
+                                <strong>{s.data || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe">
+                                <span>Data da solicitação</span>
+                                <strong>{s.dataCriacao || "-"}</strong>
+                              </div>
+                              <div className="campo-detalhe campo-detalhe-longo">
+                                <span>Justificativa</span>
+                                <strong>{s.justificativa || "-"}</strong>
+                              </div>
+
+                              {s.motivoReprovacao && (
+                                <div className="campo-detalhe campo-detalhe-longo">
+                                  <span>Motivo da reprovação</span>
+                                  <strong>{s.motivoReprovacao}</strong>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="acoes">
+                              <button onClick={() => pedirNovamente(s)}>
+                                Pedir novamente
+                              </button>
+
+                              {isLucas && (
+                                <button onClick={() => editarSolicitacao(s)}>
+                                  Editar
+                                </button>
+                              )}
+
+                              {isLucas && (
+                                <>
+                                  <button onClick={() => mudarStatus(s.id, "Pendente")}>
+                                    Pendente
+                                  </button>
+                                  <button onClick={() => mudarStatus(s.id, "Em análise")}>
+                                    Em análise
+                                  </button>
+                                  <button onClick={() => mudarStatus(s.id, "Aprovada")}>
+                                    Aprovar
+                                  </button>
+                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
+                                    Comprado
+                                  </button>
+                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                    Reprovar
+                                  </button>
+                                </>
+                              )}
+
+                              {isJoao && (
+                                <>
+                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
+                                    Comprado
+                                  </button>
+                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                    Reprovar
+                                  </button>
+                                </>
+                              )}
+
+                              {isLucas && (
+                                <button
+                                  onClick={() => excluirSolicitacao(s.id)}
+                                  style={{ background: "#dc2626" }}
+                                >
+                                  Excluir
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </div>
-                  ))}
+                      </article>
+                    );
+                  })}
 
                   {solicitacoesFiltradas.length === 0 && (
                     <p>Nenhuma solicitação encontrada.</p>
