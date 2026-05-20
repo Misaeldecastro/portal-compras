@@ -23,6 +23,9 @@ export default function SolicitacaoDetalhe() {
 async function aprovar() {
   await updateDoc(doc(db, "purchase_requests", id), {
     status: "Aprovada",
+    aprovada_lucas: true,
+    analise_lucas_finalizada: true,
+    motivo_reprovacao: "",
   });
 
   const ref = doc(db, "purchase_requests", id);
@@ -58,6 +61,8 @@ async function aprovar() {
 
     await updateDoc(doc(db, "purchase_requests", id), {
       status: "Reprovada",
+      aprovada_lucas: false,
+      analise_lucas_finalizada: true,
       motivo_reprovacao: motivo,
     });
 

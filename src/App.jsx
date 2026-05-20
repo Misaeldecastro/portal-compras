@@ -7,6 +7,7 @@ import {
   where,
   orderBy,
   getDocs,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -127,6 +128,7 @@ function App() {
           dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
           dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
           motivoReprovacao: item.motivo_reprovacao || "",
+          userId: item.user_id || "",
           userEmail: item.user_email || "",
           aprovadaLucas: item.aprovada_lucas === true,
           analiseLucasFinalizada: item.analise_lucas_finalizada === true,
@@ -164,6 +166,18 @@ function App() {
     setIdEmEdicao(null);
   }
 
+  function podeEditarSolicitacao(s) {
+    const emailSolicitante = s.userEmail?.toLowerCase().trim();
+    const solicitacaoDoUsuario =
+      emailSolicitante === emailLogado || s.userId === usuario?.uid;
+    const analiseAindaAberta =
+      !s.analiseLucasFinalizada &&
+      !s.aprovadaLucas &&
+      !["Aprovada", "Comprado"].includes(s.status);
+
+    return isLucas || (solicitacaoDoUsuario && analiseAindaAberta);
+  }
+
   async function enviarSolicitacao(e) {
     e.preventDefault();
     if (!usuario) return alert("Você precisa estar logado.");
@@ -184,6 +198,13 @@ function App() {
 
     try {
       if (idEmEdicao) {
+        const solicitacaoAtual = solicitacoes.find((s) => s.id === idEmEdicao);
+
+        if (!solicitacaoAtual || !podeEditarSolicitacao(solicitacaoAtual)) {
+          alert("Voce nao tem permissao para editar esta solicitacao.");
+          return;
+        }
+
         await updateDoc(doc(db, "purchase_requests", idEmEdicao), payload);
         alert("Solicitação atualizada com sucesso!");
       } else {
@@ -243,6 +264,11 @@ function App() {
   }
 
   function editarSolicitacao(s) {
+    if (!podeEditarSolicitacao(s)) {
+      alert("Voce nao tem permissao para editar esta solicitacao.");
+      return;
+    }
+
     setIdEmEdicao(s.id);
     setFormulario({
       solicitante: s.solicitante,
@@ -350,16 +376,38 @@ function App() {
       }
 
       if (novoStatus === "Aprovada" && isLucas) {
-        if (solicitacaoAtual) {
+        const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
+        const dadosAtualizados = snapAtualizado.exists()
+          ? snapAtualizado.data()
+          : null;
+        const solicitacaoParaSlack = dadosAtualizados
+          ? {
+              id,
+              solicitante: dadosAtualizados.solicitante || "",
+              departamento: dadosAtualizados.departamento || "",
+              item: dadosAtualizados.item || "",
+              quantidade: dadosAtualizados.quantidade || 0,
+              prioridade: dadosAtualizados.prioridade || "",
+              linkProduto1: dadosAtualizados.link_produto_1 || "",
+              linkProduto2: dadosAtualizados.link_produto_2 || "",
+              data: dadosAtualizados.data || "",
+              justificativa: dadosAtualizados.justificativa || "",
+              status: novoStatus,
+            }
+          : solicitacaoAtual
+          ? {
+              ...solicitacaoAtual,
+              status: novoStatus,
+            }
+          : null;
+
+        if (solicitacaoParaSlack) {
           const respostaSlack = await fetch("/api/slack-aprovado", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              ...solicitacaoAtual,
-              status: novoStatus,
-            }),
+            body: JSON.stringify(solicitacaoParaSlack),
           });
 
           if (!respostaSlack.ok) {
@@ -605,6 +653,7 @@ function App() {
                 <div className="lista">
                   {solicitacoesFiltradas.map((s) => {
                     const estaAberta = solicitacaoAbertaId === s.id;
+                    const podeEditar = podeEditarSolicitacao(s);
                     const statusNormalizado = (s.status || "").toLowerCase();
                     const statusClasse =
                       statusNormalizado === "comprado"
@@ -731,7 +780,7 @@ function App() {
                                 Pedir novamente
                               </button>
 
-                              {isLucas && (
+                              {podeEditar && (
                                 <button onClick={() => editarSolicitacao(s)}>
                                   Editar
                                 </button>
