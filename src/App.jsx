@@ -29,6 +29,41 @@ const formularioInicial = {
   justificativa: "",
 };
 
+function validarFormulario(form){
+  if(!form.solicitante.trim()) return "informe o solicitante";
+  if(!form.departamento.trim())return "informe o departamento";
+  
+  if(!form.item.trim() || form.item.trim().length < 3) {
+    return "informe um item com pelo menos 3 caracteres";
+  }
+
+  if (form.item.length > 200) {
+    return "Descrição muito longa, Máximo de 200 caracteres";
+  }
+
+  if(!form.data) return "informe o prazo";
+
+  const hoje = new Date();
+  hoje.setHours(0,0,0,0);
+
+  const prazo = new Date(`${form.data}T00:00:00`);
+
+  if (prazo < hoje) {
+    return "O prazo não pode ser no passado";
+  }
+  return null;
+
+}
+
+function limparTextoSlack(texto) {
+  return texto
+  .trim()
+  .replaceAll("*","\\*")
+  .replaceAll("_","\\_")
+  .replaceAll("`","\\`");
+}
+
+
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
@@ -41,6 +76,7 @@ function App() {
   const [filtroPrioridade, setFiltroPrioridade] = useState("Todas");
   const [filtroDepartamento, setFiltroDepartamento] = useState("Todos");
   const [idEmEdicao, setIdEmEdicao] = useState(null);
+  const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
   const [formulario, setFormulario] = useState(formularioInicial);
 
@@ -155,13 +191,22 @@ function App() {
   async function enviarSolicitacao(e) {
     e.preventDefault();
     if (!usuario) return alert("Você precisa estar logado.");
+    
+    const erro = validarFormulario(formulario);
+
+    if (erro) {
+      alert(erro);
+      return;
+    }
 
     setSalvando(true);
 
+    
+
     const payload = {
-      solicitante: formulario.solicitante,
-      departamento: formulario.departamento,
-      item: formulario.item,
+      solicitante: formulario.solicitante.trim(),
+      departamento: formulario.departamento.trim(),
+      item: formulario.item.trim(),
       quantidade: Number(formulario.quantidade),
       prioridade: formulario.prioridade,
       link_produto_1: formulario.linkProduto1,
@@ -193,15 +238,15 @@ function App() {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              solicitante: formulario.solicitante,
-              departamento: formulario.departamento,
-              item: formulario.item,
+              solicitante: limparTextoSlack(formulario.solicitante),
+              departamento: limparTextoSlack(formulario.departamento),
+              item: limparTextoSlack(formulario.item),
               quantidade: Number(formulario.quantidade),
               prioridade: formulario.prioridade,
               linkProduto1: formulario.linkProduto1,
               linkProduto2: formulario.linkProduto2 || "",
               data: formulario.data || "",
-              justificativa: formulario.justificativa,
+              justificativa: limparTextoSlack(formulario.justificativa),
               idSolicitacao: docRef.id,
               linkAnalise,
             }),
@@ -321,6 +366,10 @@ function App() {
       alert("Erro ao alterar status");
       console.error(error);
     }
+  }
+
+  function alternarDetalhesSolicitacao(id) {
+    setSolicitacaoAbertaId((idAtual) => (idAtual === id ? null : id));
   }
 
   const solicitacoesFiltradas = useMemo(() => {
@@ -586,103 +635,113 @@ function App() {
                 <p>Carregando...</p>
               ) : (
                 <div className="lista">
-                  {solicitacoesFiltradas.map((s) => (
-                    <div key={s.id} className="item-lista">
-                      <h3>{s.item}</h3>
+                  {solicitacoesFiltradas.map((s) => {
+                    const detalhesAbertos = solicitacaoAbertaId === s.id;
 
-                      <p>
-                        <strong>Solicitante:</strong> {s.solicitante}
-                      </p>
-                      <p>
-                        <strong>Departamento:</strong> {s.departamento}
-                      </p>
-                      <p>
-                        <strong>Quantidade:</strong> {s.quantidade}
-                      </p>
-                      <p>
-                        <strong>Prioridade:</strong> {s.prioridade}
-                      </p>
-                      <p>
-                        <strong>Status:</strong> {s.status}
-                      </p>
-                      <p>
-                        <strong>Usuário:</strong> {s.userEmail || "-"}
-                      </p>
+                    return (
+                      <div
+                        key={s.id}
+                        className={`item-lista solicitacao-card ${detalhesAbertos ? "aberta" : ""}`}
+                      >
+                        <div className="solicitacao-resumo">
+                          <button
+                            type="button"
+                            className="solicitacao-titulo"
+                            onClick={() => alternarDetalhesSolicitacao(s.id)}
+                          >
+                            <span>{s.item || "Solicitação sem item"}</span>
+                            <span className="solicitacao-icone">
+                              {detalhesAbertos ? "-" : "+"}
+                            </span>
+                          </button>
 
-                      <p>
-                        <strong>Link do produto 1:</strong>{" "}
-                        {s.linkProduto1 ? (
-                          <a href={s.linkProduto1} target="_blank" rel="noreferrer">
-                            Abrir link
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </p>
+                          <div className="solicitacao-etiquetas">
+                            <span className="pill-status">{s.status}</span>
+                            <span className="pill-prioridade">{s.prioridade}</span>
+                          </div>
+                        </div>
 
-                      <p>
-                        <strong>Link do produto 2:</strong>{" "}
-                        {s.linkProduto2 ? (
-                          <a href={s.linkProduto2} target="_blank" rel="noreferrer">
-                            Abrir link
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </p>
+                        <div className="solicitacao-meta">
+                          <p><strong>Solicitante:</strong> {s.solicitante}</p>
+                          <p><strong>Departamento:</strong> {s.departamento}</p>
+                          <p><strong>Quantidade:</strong> {s.quantidade}</p>
+                          <p><strong>Data:</strong> {s.data || "-"}</p>
+                        </div>
 
-                      <p>
-                        <strong>Data:</strong> {s.data || "-"}
-                      </p>
-                      <p>
-                        <strong>Data da solicitação:</strong> {s.dataCriacao}
-                      </p>
-                      <p>
-                        <strong>Justificativa:</strong> {s.justificativa}
-                      </p>
+                        {detalhesAbertos && (
+                          <div className="solicitacao-detalhes">
+                            <p><strong>Usuário:</strong> {s.userEmail || "-"}</p>
+                            <p><strong>Data da solicitação:</strong> {s.dataCriacao}</p>
+                            <p><strong>Justificativa:</strong> {s.justificativa || "-"}</p>
 
-                      {s.motivoReprovacao && (
-                        <p>
-                          <strong>Motivo da reprovação:</strong>{" "}
-                          {s.motivoReprovacao}
-                        </p>
-                      )}
+                            <p>
+                              <strong>Link do produto 1:</strong>{" "}
+                              {s.linkProduto1 ? (
+                                <a href={s.linkProduto1} target="_blank" rel="noreferrer">
+                                  Abrir link
+                                </a>
+                              ) : (
+                                "-"
+                              )}
+                            </p>
 
-                      <div className="acoes">
-                        {isLucas && (
-                          <button onClick={() => editarSolicitacao(s)}>
-                            Editar
-                        </button>
-                        )}
+                            <p>
+                              <strong>Link do produto 2:</strong>{" "}
+                              {s.linkProduto2 ? (
+                                <a href={s.linkProduto2} target="_blank" rel="noreferrer">
+                                  Abrir link
+                                </a>
+                              ) : (
+                                "-"
+                              )}
+                            </p>
 
-                      {(isLucas) && (
-                        <>
-                        <button onClick={() => mudarStatus(s.id, "Pendente")}>Pendente</button>
-                        <button onClick={() => mudarStatus(s.id, "Em análise")}>Em análise</button>
-                        <button onClick={() => mudarStatus(s.id, "Aprovada")}>Aprovar</button>
-                        <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
-                        <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
-                        </>
-                      )}
+                            {s.motivoReprovacao && (
+                              <p>
+                                <strong>Motivo da reprovação:</strong>{" "}
+                                {s.motivoReprovacao}
+                              </p>
+                            )}
 
-                      {(isJoao) && (
-                      <>
-                      <button onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
-                      <button onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
-                      </>
-                      )}
+                            <div className="acoes">
+                              {isLucas && (
+                                <button type="button" onClick={() => editarSolicitacao(s)}>
+                                  Editar
+                                </button>
+                              )}
 
-                        {isLucas && (
-                         <button
-                          onClick={() => excluirSolicitacao(s.id)}
-                          style={{ background: "#dc2626" }}
-                        >
-                          Excluir
-                        </button>
+                              {isLucas && (
+                                <>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Pendente")}>Pendente</button>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Em análise")}>Em análise</button>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Aprovada")}>Aprovar</button>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
+                                </>
+                              )}
+
+                              {isJoao && (
+                                <>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Comprado")}>Comprado</button>
+                                  <button type="button" onClick={() => mudarStatus(s.id, "Reprovada")}>Reprovar</button>
+                                </>
+                              )}
+
+                              {isLucas && (
+                                <button
+                                  type="button"
+                                  onClick={() => excluirSolicitacao(s.id)}
+                                  style={{ background: "#dc2626" }}
+                                >
+                                  Excluir
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {solicitacoesFiltradas.length === 0 && (
                     <p>Nenhuma solicitação encontrada.</p>
