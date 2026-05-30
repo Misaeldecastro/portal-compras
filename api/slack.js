@@ -1,5 +1,13 @@
 import { enviarMensagemParaUsuario } from "./slack-utils.js";
 
+function escaparSlack(texto) {
+  return String(texto || "-")
+    .trim()
+    .replaceAll("*", "\\*")
+    .replaceAll("_", "\\_")
+    .replaceAll("`", "\\`");
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -33,13 +41,13 @@ export default async function handler(req, res) {
 
     const linkPortal = "https://portal-compras-five.vercel.app/";
 
-  const mensagem =
-    `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
-    `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
-    `*Solicitante:* ${solicitante || "-"}\n` +
-    `*Departamento:* ${departamento || "-"}\n` +
-    `*Item:* ${item || "-"}\n` +
-    `\n*Acessar portal de solicitações:* ${linkPortal}`;
+  const mensagem = 
+  `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
+  `*Justificativa / Descrição:* ${escaparSlack(justificativa)}\n` +
+  `*Solicitante:* ${escaparSlack(solicitante)}\n` +
+  `*Departamento:* ${escaparSlack(departamento)}\n` +
+  `*Item:* ${escaparSlack(item)}\n` +
+  `\n*Acessar portal de solicitações:* ${linkPortal}`;
 
     await enviarMensagemParaUsuario(lucasId, mensagem);
 

@@ -1,3 +1,11 @@
+function escaparSlack(texto) {
+  return String(texto || "-")
+    .trim()
+    .replaceAll("*", "\\*")
+    .replaceAll("_", "\\_")
+    .replaceAll("`", "\\`");
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).end();
@@ -17,15 +25,15 @@ export default async function handler(req, res) {
 
     const mensagem =
       `*SOLICITAÇÃO APROVADA* \n\n` +
-      `*Item:* ${data.item}\n` +
-      `*Solicitante:* ${data.solicitante}\n` +
-      `*Departamento:* ${data.departamento}\n` +
+      `*Item:* ${escaparSlack(data.item)}\n` +
+      `*Solicitante:* ${escaparSlack(data.solicitante)}\n` +
+      `*Departamento:* ${escaparSlack(data.departamento)}\n` +
       `*Quantidade:* ${data.quantidade}\n` +
-      `*Prioridade:* ${data.prioridade}\n` +
+      `*Prioridade:* ${escaparSlack(data.prioridade)}\n` +
       `*Prazo:* ${data.data || "-"}\n` +
       `*Link do produto 1:* ${link1}\n`+
       `*Link do produto 2:* ${link2}\n`+
-      `*Justificativa:* ${data.justificativa || "-"}\n`+
+      `*Justificativa:* ${escaparSlack(data.justificativa) || "-"}\n`+
       `\n*portal de solicitações:* ${linkPortal}`;
 
     const response = await fetch("https://slack.com/api/chat.postMessage", {
