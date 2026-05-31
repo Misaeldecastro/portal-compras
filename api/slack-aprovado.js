@@ -14,7 +14,13 @@ export default async function handler(req, res) {
   try {
     const data = req.body || {};
 
-    const linkPortal = "https://portal-compras-five.vercel.app/";
+    const linkPortal = process.env.PORTAL_URL;
+    const joaoId = process.env.SLACK_JOAO_USER_ID;
+
+    if (!process.env.SLACK_BOT_TOKEN || !joaoId || !linkPortal) {
+      return res.status(500).json({ error: "SLACK_BOT_TOKEN, SLACK_JOAO_USER_ID ou PORTAL_URL não configurado" });
+    }
+
     const linkProduto1 = data.linkProduto1 || data.link_produto_1;
     const linkProduto2 = data.linkProduto2 || data.link_produto_2;
     
@@ -43,7 +49,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        channel: "U010UDZ4XGD", //meu id
+        channel: joaoId,
         text: mensagem,
       }),
     });

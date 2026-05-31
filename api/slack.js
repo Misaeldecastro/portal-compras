@@ -34,12 +34,11 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     const lucasId = process.env.SLACK_LUCAS_USER_ID;
+    const linkPortal = process.env.PORTAL_URL;
 
-    if (!lucasId) {
-      return res.status(500).json({ error: "SLACK_LUCAS_USER_ID não configurado" });
+    if (!lucasId || !linkPortal) {
+      return res.status(500).json({ error: "SLACK_LUCAS_USER_ID ou PORTAL_URL não configurado" });
     }
-
-    const linkPortal = "https://portal-compras-five.vercel.app/";
 
   const mensagem = 
   `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
