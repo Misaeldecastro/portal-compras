@@ -9,6 +9,7 @@ import {
   getDocs,
   getDoc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -17,6 +18,7 @@ import {
 import { auth, db } from "./firebase";
 import Login from "./Login";
 import logo from "./assets/logo.png";
+
 
 const formularioInicial = {
   solicitante: "",
@@ -101,14 +103,26 @@ function App() {
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
   const [formulario, setFormulario] = useState(formularioInicial);
+  const [role, setRole] = useState("funcionario");
+
+  const [colaboradores, setColaboradores] = useState([]);
+  const [carregandoColaboradores, setCarregandoColaboradores] = useState(false);
+  const [rolesEditados, setRolesEditados] = useState({});
+  const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState(null);
+  const [statusEditados, setStatusEditados] = useState({});
+  const [mensagensColaboradores, setMensagensColaboradores] = useState({});
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
-  const isMisael = emailLogado === "m.castro@oliv-e.health";
-  const isLucas = emailLogado === "l.andrade@oliv-e.health";
-  const isJoao = emailLogado === "j.furlan@oliv-e.health";
+  const isAdminFull = role === "admin_full";
+  const isAdmin = role === "admin" || role === "admin_full";
+  const isAprovador = role === "aprovador";
+  const isComprador = role === "comprador";
+  const isFuncionario = role === "funcionario";
+  const podeAprovar = isAprovador || isAdminFull;
+  const podeComprar = isComprador || isAdminFull;
+  const podeExcluir = isAprovador || isAdminFull;
 
-  const isAdmin = isMisael || isLucas || isJoao;
-
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       const cadastroEmAndamento =
@@ -118,23 +132,89 @@ function App() {
         if (user) {
           await signOut(auth);
         }
+
         setUsuario(null);
+        setRole("funcionario");
         setCarregando(false);
         return;
       }
 
-      setUsuario(user || null);
-      setCarregando(false);
-    });
+    if (!user) {
+        setUsuario(null);
+        setRole("funcionario");
+        setCarregando(false);
+        return;
+    }
 
-    return () => unsubscribe();
-  }, []);
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          email: user.email,
+          role: "funcionario",
+          ativo: true,
+          createdAt: serverTimestamp(),
+        });
+        
+        setRole("funcionario");
+      } else {
+        const dadosUsuario = docSnap.data();
+
+        if (dadosUsuario.ativo === false) {
+          alert("Seu acesso ao portal está desativado.");
+          await signOut(auth);
+          setUsuario(null);
+          setRole("funcionario");
+          return;
+        }
+
+        setRole(dadosUsuario.role || "funcionario");
+      }
+
+      setUsuario(user);
+    } catch (error) {
+      console.error("Erro ao buscar usuário:", error);
+      setUsuario(user);
+      setRole("funcionario");
+    } finally {
+      setCarregando(false);
+    }
+  });
+
+  return () => unsubscribe();    
+}, []);
+
+  async function buscarColaboradores() {
+  if (!isAdminFull) return;
+
+  setCarregandoColaboradores(true);
+
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+
+    const lista = snapshot.docs.map((d) => ({
+      uid: d.id,
+      email: d.data().email || "",
+      role: d.data().role || "funcionario",
+      ativo: d.data().ativo !== false,
+    }));
+
+    setColaboradores(lista);
+  } catch (error) {
+    console.error("Erro ao buscar colaboradores:", error);
+    alert("Erro ao buscar colaboradores.");
+  } finally {
+    setCarregandoColaboradores(false);
+  }
+  }
 
   useEffect(() => {
     if (usuario) buscarSolicitacoes();
     else setSolicitacoes([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, isAdmin]);
+  }, [usuario, role]);
 
   async function buscarSolicitacoes() {
     if (!usuario) return;
@@ -143,15 +223,15 @@ function App() {
     try {
       let q;
 
-  if (isLucas) {
+  if (isAprovador || isAdminFull) {
     q = query(
     collection(db, "purchase_requests"),
     orderBy("data_criacao", "desc")
   );
-  } else if (isJoao) {
+  } else if (isComprador) {
     q = query(
       collection(db, "purchase_requests"),
-      where("aprovada_lucas", "==", true),
+      where("aprovada_aprovador", "==", true),
       orderBy("data_criacao", "desc")
     );
   } else {
@@ -186,17 +266,17 @@ function App() {
           motivoReprovacao: item.motivo_reprovacao || "",
           userId: item.user_id || "",
           userEmail: item.user_email || "",
-          aprovadaLucas: item.aprovada_lucas === true,
-          analiseLucasFinalizada: item.analise_lucas_finalizada === true,
+          aprovadaAprovador: item.aprovada_aprovador === true,
+          analiseAprovadorFinalizada: item.analise_aprovador_finalizada === true,
         };
       });
 
       setSolicitacoes(
-        isLucas
+        isAprovador
           ? dadosTratados.filter(
               (s) =>
-                !s.aprovadaLucas &&
-                !s.analiseLucasFinalizada &&
+                !s.aprovadaAprovador &&
+                !s.analiseAprovadorFinalizada &&
                 !["Aprovada", "Reprovada", "Comprado"].includes(s.status)
             )
           : dadosTratados
@@ -211,6 +291,12 @@ function App() {
       setCarregando(false);
     }
   }
+
+  useEffect(() => {
+    if (paginaAtiva === "colaboradores" && isAdminFull) {
+      buscarColaboradores();
+    }
+  }, [paginaAtiva, isAdminFull]);
 
   function alterarFormulario(e) {
     const { name, value } = e.target;
@@ -227,11 +313,11 @@ function App() {
     const solicitacaoDoUsuario =
       emailSolicitante === emailLogado || s.userId === usuario?.uid;
     const analiseAindaAberta =
-      !s.analiseLucasFinalizada &&
-      !s.aprovadaLucas &&
+      !s.analiseAprovadorFinalizada &&
+      !s.aprovadaAprovador &&
       !["Aprovada", "Comprado"].includes(s.status);
 
-    return isLucas || (solicitacaoDoUsuario && analiseAindaAberta);
+    return isAprovador || (solicitacaoDoUsuario && analiseAindaAberta);
   }
 
   async function enviarSolicitacao(e) {
@@ -275,7 +361,7 @@ function App() {
           ...payload,
           status: "Pendente",
           motivo_reprovacao: "",
-          analise_lucas_finalizada: false,
+          analise_aprovador_finalizada: false,
           user_id: usuario.uid,
           user_email: usuario.email,
           data_criacao: serverTimestamp(),
@@ -381,22 +467,22 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
-    const lucasPodeAlterar = isLucas;
+    const aprovadorPodeAlterar = podeAprovar;
 
-    const misaelOuJoaoPodeAlterar =
-      isJoao &&
-      (novoStatus === "Comprado" || novoStatus === "Reprovada");
+    const compradorPodeAlterar = 
+    podeComprar && 
+    (novoStatus === "Comprado" || novoStatus === "Reprovada");
 
-    if (!lucasPodeAlterar && !misaelOuJoaoPodeAlterar) {
+    if (!aprovadorPodeAlterar && !compradorPodeAlterar) {
       alert("Você não tem permissão para alterar o status.");
       return;
     }
 
-    const analiseFinalizadaLucas =
-      isLucas && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
+    const analiseFinalizadaAprovador =
+      podeAprovar && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
     const solicitacaoAtual = solicitacoes.find((s) => s.id === id);
 
-    if (analiseFinalizadaLucas) {
+    if (analiseFinalizadaAprovador) {
       const acao = novoStatus === "Aprovada" ? "aprovar" : "reprovar";
       const nomeSolicitacao = solicitacaoAtual?.item
         ? ` "${solicitacaoAtual.item}"`
@@ -423,22 +509,22 @@ function App() {
         motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
       };
 
-      if (novoStatus === "Aprovada" && isLucas) {
-        dadosAtualizacao.aprovada_lucas = true;
+      if (novoStatus === "Aprovada" && podeAprovar) {
+        dadosAtualizacao.aprovada_aprovador = true;
       }
 
-      if (analiseFinalizadaLucas) {
-        dadosAtualizacao.analise_lucas_finalizada = true;
+      if (analiseFinalizadaAprovador) {
+        dadosAtualizacao.analise_aprovador_finalizada = true;
       }
 
       await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
 
-      if (analiseFinalizadaLucas) {
+      if (analiseFinalizadaAprovador) {
         setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
         setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
       }
 
-      if (novoStatus === "Aprovada" && isLucas) {
+      if (novoStatus === "Aprovada" && podeAprovar) {
         const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
         const dadosAtualizados = snapAtualizado.exists()
           ? snapAtualizado.data()
@@ -487,6 +573,48 @@ function App() {
     }
   }
 
+
+  async function salvarColaborador(uid, novoRole, ativo) {
+    if (!isAdminFull) return; 
+
+    try {
+      await updateDoc(doc(db, "users", uid), {
+        role: novoRole,
+        ativo,
+      });
+
+      setColaboradores((prev) =>
+        prev.map((c) =>
+          c.uid === uid ? { ...c, role: novoRole, ativo } : c
+        )
+      );
+
+      setRolesEditados((prev) => {
+        const novo = { ...prev };
+        delete novo[uid];
+        return novo;
+      });
+
+      setStatusEditados((prev) => {
+        const novo = { ...prev };
+        delete novo[uid];
+        return novo;
+      });
+
+      setMensagensColaboradores((prev) => ({
+        ...prev,
+        [uid]: "Salvo com sucesso!",
+      }));
+
+      setColaboradorEmEdicao(null);
+
+    } catch (error) {
+      console.error("Erro ao salvar colaborador:",error);
+      alert("Erro ao salvar colaborador.");
+    }
+  }
+
+  
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
@@ -532,12 +660,17 @@ function App() {
             Fazer uma Solicitação
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
-            {isLucas
+            {isAprovador
               ? "Todas as solicitações"
-              : isMisael || isJoao
+              : isAdminFull || isComprador
               ? "Todas as Solicitações"
               : "Minhas solicitações"}
           </button>
+          {isAdminFull && (
+            <button className="menu-item" onClick={() => setPaginaAtiva("colaboradores")}>
+              Colaboradores
+            </button>
+          )}
         </nav>
       </aside>
 
@@ -559,6 +692,91 @@ function App() {
             Usuário logado: <strong>{usuario.email}</strong>
             {isAdmin && <strong> — Admin</strong>}
           </p>
+
+          {paginaAtiva === "colaboradores" && isAdminFull && (
+          <div className="bloco">
+          <h2>Colaboradores</h2>
+
+          {carregandoColaboradores ? (
+            <p>Carregando...</p>
+            ) : (
+            <div className="lista">
+              {colaboradores.map((colaborador) => (
+                <article key={colaborador.uid} className="item-lista">
+                  <div className="colaborador-cabecalho">
+                  <div>
+                   <strong>{colaborador.email || colaborador.uid}</strong>
+                   <p>{colaborador.ativo ? "Ativo" : "Desativado"}</p>
+                  </div>
+
+                  <button
+                   type="button"
+                   className="botao-editar-colaborador"
+                  onClick={() => 
+                    setColaboradorEmEdicao((uidAtual) =>
+                      uidAtual === colaborador.uid ? null : colaborador.uid
+                    )
+                  }
+                  title="Editar colaborador"
+                  >
+                    <i class="fi fi-rr-edit"></i>
+                  </button>
+                </div> 
+
+                  {colaboradorEmEdicao === colaborador.uid && (
+                   <>
+                  <select
+                   value={rolesEditados[colaborador.uid] || colaborador.role}
+                   onChange={(e) =>
+                    setRolesEditados((prev) => ({
+                    ...prev,
+                    [colaborador.uid]: e.target.value,
+                    }))
+                    }
+                  >
+                    <option value="funcionario">Funcionário</option>
+                    <option value="admin_full">Admin Full</option>
+                    <option value="aprovador">Aprovador</option>
+                    <option value="comprador">Comprador</option>
+                  </select>
+
+                    <button
+                     type="button"
+                     onClick={() =>
+                      setStatusEditados((prev) => ({
+                      ...prev,
+                     [colaborador.uid]: !(prev[colaborador.uid] ?? colaborador.ativo),
+                      }))
+                      }
+                    >
+                      {(statusEditados[colaborador.uid] ?? colaborador.ativo)
+                      ? "Desativar"
+                      : "Ativar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        salvarColaborador(
+                          colaborador.uid,
+                          rolesEditados[colaborador.uid] || colaborador.role,
+                          statusEditados[colaborador.uid] ?? colaborador.ativo
+                        )
+                      }
+                    >
+                      Salvar
+                    </button>
+                  </>
+                  )}
+                  {mensagensColaboradores[colaborador.uid] && (
+                  <p>{mensagensColaboradores[colaborador.uid]}</p>
+                  )}
+                </article>
+                ))}
+                </div>
+                )}
+                </div>
+          )}
 
           {paginaAtiva === "dashboard" && (
             <div className="cards">
@@ -695,9 +913,9 @@ function App() {
           {paginaAtiva === "minhas" && (
             <div className="bloco">
               <h2>
-               {isLucas
+               {isAprovador
                 ? "Todas as solicitações"
-                : isMisael || isJoao
+                : isAdminFull || isComprador
                 ? "Todas as solicitações"
                 : "Minhas solicitações"}
               </h2>
@@ -849,7 +1067,7 @@ function App() {
                                 </button>
                               )}
 
-                              {isLucas && (
+                              {podeAprovar && (
                                 <>
                                   <button onClick={() => mudarStatus(s.id, "Pendente")}>
                                     Pendente
@@ -869,7 +1087,7 @@ function App() {
                                 </>
                               )}
 
-                              {isJoao && (
+                              {podeComprar && !podeAprovar && (
                                 <>
                                   <button onClick={() => mudarStatus(s.id, "Comprado")}>
                                     Comprado
@@ -880,7 +1098,7 @@ function App() {
                                 </>
                               )}
 
-                              {isLucas && (
+                              {podeExcluir && (
                                 <button
                                   onClick={() => excluirSolicitacao(s.id)}
                                   style={{ background: "#dc2626" }}
