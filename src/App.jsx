@@ -719,7 +719,7 @@ function App() {
                   }
                   title="Editar colaborador"
                   >
-                    <i class="fi fi-rr-edit"></i>
+                    <i className="fi fi-rr-edit"></i>
                   </button>
                 </div> 
 
