@@ -1,24 +1,31 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [solicitacao, setSolicitacao] = useState(null);
 
   useEffect(() => {
-    async function buscar() {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        navigate("/");
+        return;
+      }
+
       const ref = doc(db, "purchase_requests", id);
       const snap = await getDoc(ref);
 
       if (snap.exists()) {
         setSolicitacao({ id: snap.id, ...snap.data() });
       }
-    }
-
-    buscar();
-  }, [id]);
+    });
+    
+    return () => unsubscribe();
+  }, [id, navigate]);
 
 async function aprovar() {
   await updateDoc(doc(db, "purchase_requests", id), {
