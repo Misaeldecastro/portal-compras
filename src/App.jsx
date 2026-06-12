@@ -518,11 +518,6 @@ function App() {
 
       await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
 
-      if (analiseFinalizadaAprovador) {
-        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
-        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
-      }
-
       if (novoStatus === "Aprovada" && podeAprovar) {
         const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
         const dadosAtualizados = snapAtualizado.exists()
@@ -564,8 +559,35 @@ function App() {
           }
         }
       }
+      
+      const deveRemoverDaLista =
+        analiseFinalizadaAprovador && isAprovador && !isAdminFull;
 
-      await buscarSolicitacoes();
+      if (deveRemoverDaLista) {
+        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
+        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
+      } else {
+        setSolicitacoes((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                ...s,
+                status: novoStatus,
+                motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
+                aprovadaAprovador:
+                  novoStatus === "Aprovada" && podeAprovar
+                    ? true
+                    : s.aprovadaAprovador,
+                analiseAprovadorFinalizada:
+                  analiseFinalizadaAprovador
+                    ? true
+                    : s.analiseAprovadorFinalizada,
+              }
+            : s
+          )
+        );
+      }
+
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
