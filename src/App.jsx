@@ -869,9 +869,9 @@ function App() {
                   value={formulario.prioridade}
                   onChange={alterarFormulario}
                 >
-                  <option>Prioridade Alta</option>
-                  <option>Prioridade Média</option>
-                  <option>Prioridade Baixa</option>
+                  <option value="Alta">Prioridade Alta</option>
+                  <option value="Média">Prioridade Média</option>
+                  <option value="Baixa">Prioridade Baixa</option>
                 </select>
 
                 <input
