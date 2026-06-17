@@ -30,6 +30,62 @@ const formularioInicial = {
   justificativa: "",
 };
 
+function limparTexto(texto) {
+  return String(texto || "").trim();
+}
+
+
+function validarFormulario(form) {
+  const solicitante = limparTexto(form.solicitante);
+  const departamento = limparTexto(form.departamento);
+  const item = limparTexto(form.item);
+  const justificativa = limparTexto(form.justificativa);
+
+  if (!justificativa) return "Informe a justificativa.";
+
+  const quantidade = Number(form.quantidade);
+
+  if (!Number.isFinite(quantidade) || quantidade <= 0) {
+    return "Informe uma quantidade válida.";
+  }
+
+  if (!limparTexto(form.linkProduto1)) {
+    return "Informe o link do produto 1.";
+  }
+
+  if (solicitante.length > 100) return "Nome do solicitante muito longo.";
+  if (departamento.length > 100) return "Departamento muito longo.";
+  if (!solicitante) return "Informe o solicitante.";
+  if (!departamento) return "Informe o departamento.";
+
+  if (item.length < 3) {
+    return "Descreva o item com pelo menos 3 caracteres.";
+  }
+
+  if (item.length > 200) {
+    return "Descrição muito longa. Máximo de 200 caracteres.";
+  }
+
+  if (justificativa.length > 500) {
+    return "Justificativa muito longa. Máximo de 500 caracteres.";
+  }
+
+  if (!form.data) {
+    return "Informe o prazo.";
+  }
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const prazo = new Date(`${form.data}T00:00:00`);
+
+  if (prazo < hoje) {
+    return "O prazo não pode ser uma data no passado.";
+  }
+
+  return null;
+}
+
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
@@ -182,19 +238,26 @@ function App() {
     e.preventDefault();
     if (!usuario) return alert("Você precisa estar logado.");
 
+    const erro = validarFormulario(formulario);
+
+  if (erro) {
+    alert(erro);
+  return;
+  }
+
     setSalvando(true);
 
-    const payload = {
-      solicitante: formulario.solicitante,
-      departamento: formulario.departamento,
-      item: formulario.item,
-      quantidade: Number(formulario.quantidade),
-      prioridade: formulario.prioridade,
-      link_produto_1: formulario.linkProduto1,
-      link_produto_2: formulario.linkProduto2 || "",
-      data: formulario.data || null,
-      justificativa: formulario.justificativa,
-    };
+  const payload = {
+    solicitante: limparTexto(formulario.solicitante),
+    departamento: limparTexto(formulario.departamento),
+    item: limparTexto(formulario.item),
+    quantidade: Number(formulario.quantidade),
+    prioridade: formulario.prioridade,
+    link_produto_1: limparTexto(formulario.linkProduto1),
+    link_produto_2: limparTexto(formulario.linkProduto2),
+    data: formulario.data || null,
+    justificativa: limparTexto(formulario.justificativa),
+  };
 
     try {
       if (idEmEdicao) {
@@ -226,19 +289,19 @@ function App() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              solicitante: formulario.solicitante,
-              departamento: formulario.departamento,
-              item: formulario.item,
-              quantidade: Number(formulario.quantidade),
-              prioridade: formulario.prioridade,
-              linkProduto1: formulario.linkProduto1,
-              linkProduto2: formulario.linkProduto2 || "",
-              data: formulario.data || "",
-              justificativa: formulario.justificativa,
-              idSolicitacao: docRef.id,
-              linkAnalise,
-            }),
+      body: JSON.stringify({
+        solicitante: limparTexto(formulario.solicitante),
+        departamento: limparTexto(formulario.departamento),
+        item: limparTexto(formulario.item),
+        quantidade: Number(formulario.quantidade),
+        prioridade: limparTexto(formulario.prioridade),
+        linkProduto1: limparTexto(formulario.linkProduto1),
+        linkProduto2: limparTexto(formulario.linkProduto2),
+        data: formulario.data || "",
+        justificativa: limparTexto(formulario.justificativa),
+        idSolicitacao: docRef.id,
+        linkAnalise,
+        }),
           });
 
           if (!respostaSlack.ok) {
