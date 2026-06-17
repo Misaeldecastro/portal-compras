@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
@@ -96,9 +96,9 @@ function App() {
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("Todos");
-  const [filtroPrioridade, setFiltroPrioridade] = useState("Todas");
-  const [filtroDepartamento, setFiltroDepartamento] = useState("Todos");
+  const filtroStatus = "Todos";
+  const filtroPrioridade = "Todas";
+  const filtroDepartamento = "Todos";
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
@@ -117,7 +117,6 @@ function App() {
   const isAdmin = role === "admin" || role === "admin_full";
   const isAprovador = role === "aprovador";
   const isComprador = role === "comprador";
-  const isFuncionario = role === "funcionario";
   const podeAprovar = isAprovador || isAdminFull;
   const podeComprar = isComprador || isAdminFull;
   const podeExcluir = isAprovador || isAdminFull;
@@ -186,7 +185,7 @@ function App() {
   return () => unsubscribe();    
 }, []);
 
-  async function buscarColaboradores() {
+  const buscarColaboradores = useCallback(async function buscarColaboradores() {
   if (!isAdminFull) return;
 
   setCarregandoColaboradores(true);
@@ -208,7 +207,7 @@ function App() {
   } finally {
     setCarregandoColaboradores(false);
   }
-  }
+  }, [isAdminFull]);
 
   useEffect(() => {
     if (usuario) buscarSolicitacoes();
@@ -296,7 +295,7 @@ function App() {
     if (paginaAtiva === "colaboradores" && isAdminFull) {
       buscarColaboradores();
     }
-  }, [paginaAtiva, isAdminFull]);
+  }, [paginaAtiva, isAdminFull, buscarColaboradores]);
 
   function alterarFormulario(e) {
     const { name, value } = e.target;
@@ -632,11 +631,6 @@ function App() {
       return bateBusca && bateStatus && batePrioridade && bateDepartamento;
     });
   }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
-
-  const departamentosUnicos = useMemo(
-    () => [...new Set(solicitacoes.map((s) => s.departamento).filter(Boolean))],
-    [solicitacoes]
-  );
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
