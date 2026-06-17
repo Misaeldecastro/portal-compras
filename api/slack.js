@@ -33,11 +33,11 @@ export default async function handler(req, res) {
       linkAnalise,
     } = req.body || {};
 
-    const lucasId = process.env.SLACK_LUCAS_USER_ID;
+    const aprovadorId = process.env.SLACK_APROVADOR_USER_ID;
     const linkPortal = process.env.PORTAL_URL;
 
-    if (!lucasId || !linkPortal) {
-      return res.status(500).json({ error: "SLACK_LUCAS_USER_ID ou PORTAL_URL não configurado" });
+    if (!aprovadorId || !linkPortal) {
+      return res.status(500).json({ error: "SLACK_APROVADOR_USER_ID ou PORTAL_URL não configurado" });
     }
 
   const mensagem = 
@@ -48,11 +48,11 @@ export default async function handler(req, res) {
   `*Item:* ${escaparSlack(item)}\n` +
   `\n*Acessar portal de solicitações:* ${linkPortal}`;
 
-    await enviarMensagemParaUsuario(lucasId, mensagem);
+    await enviarMensagemParaUsuario(aprovadorId, mensagem);
 
     return res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Erro ao enviar para o Lucas:", error);
+    console.error("Erro ao enviar para o Aprovador:", error);
     return res.status(500).json({
       error: "Erro interno",
       details: error.message,
