@@ -96,9 +96,6 @@ function App() {
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
-  const filtroStatus = "Todos";
-  const filtroPrioridade = "Todas";
-  const filtroDepartamento = "Todos";
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
@@ -617,20 +614,14 @@ function App() {
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
-      const bateBusca =
+
+      return (
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto);
-
-      const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
-      const batePrioridade =
-        filtroPrioridade === "Todas" || s.prioridade === filtroPrioridade;
-      const bateDepartamento =
-        filtroDepartamento === "Todos" || s.departamento === filtroDepartamento;
-
-      return bateBusca && bateStatus && batePrioridade && bateDepartamento;
+        s.item.toLowerCase().includes(texto)
+      );
     });
-  }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
+  }, [solicitacoes, busca]);
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -1063,17 +1054,11 @@ function App() {
 
                               {podeAprovar && (
                                 <>
-                                  <button onClick={() => mudarStatus(s.id, "Pendente")}>
-                                    Pendente
-                                  </button>
                                   <button onClick={() => mudarStatus(s.id, "Em análise")}>
                                     Em análise
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Aprovada")}>
                                     Aprovar
-                                  </button>
-                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
-                                    Comprado
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Reprovada")}>
                                     Reprovar
@@ -1081,15 +1066,16 @@ function App() {
                                 </>
                               )}
 
-                              {podeComprar && !podeAprovar && (
-                                <>
+                              {(isComprador || isAdminFull) && (
                                   <button onClick={() => mudarStatus(s.id, "Comprado")}>
                                     Comprado
                                   </button>
-                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
-                                    Reprovar
-                                  </button>
-                                </>
+                              )}
+
+                              {isComprador && (
+                                <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                Reprovar
+                                </button>
                               )}
 
                               {podeExcluir && (
