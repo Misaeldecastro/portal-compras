@@ -516,7 +516,13 @@ function App() {
         dadosAtualizacao.analise_aprovador_finalizada = true;
       }
 
-      await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
+      try {
+        await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
+      } catch (erro) {
+        alert("Erro ao salvar aprovação. Tente novamente.");
+        console.error(erro);
+        return;
+      }
 
       if (analiseFinalizadaAprovador) {
         setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
@@ -524,10 +530,13 @@ function App() {
       }
 
       if (novoStatus === "Aprovada" && podeAprovar) {
+      try{
         const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
+
         const dadosAtualizados = snapAtualizado.exists()
           ? snapAtualizado.data()
           : null;
+
         const solicitacaoParaSlack = dadosAtualizados
           ? {
               id,
@@ -559,18 +568,21 @@ function App() {
           });
 
           if (!respostaSlack.ok) {
-            const erroTexto = await respostaSlack.text();
-            console.error("Erro ao enviar aprovação para slack:", erroTexto);
+            throw new Error("Slack respondeu com erro");
           }
         }
+      } catch (erro) {
+        alert("Solicitação aprovada, mas a notificação Slack falhou. Avise o Comprador manualmente.");
+        console.error(erro);
       }
-
-      await buscarSolicitacoes();
-    } catch (error) {
-      alert("Erro ao alterar status");
-      console.error(error);
     }
+
+    await buscarSolicitacoes();
+  } catch (error) {
+    alert("Erro ao alterar status");
+    console.error(error);
   }
+}
 
 
   async function salvarColaborador(uid, novoRole, ativo) {
