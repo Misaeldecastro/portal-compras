@@ -279,7 +279,34 @@ body {
   text-decoration: underline;
 }
 
+.colaborador-cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
 
+.item-lista .botao-editar-colaborador {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  background: #dff1f2;
+  color: #236470;
+  border: 1px solid #bddfe1;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  line-height: 1;
+}
+
+.botao-editar-colaborador svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
 
 /* ===== CARDS ===== */
 

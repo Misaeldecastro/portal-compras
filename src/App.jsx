@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
@@ -9,6 +9,7 @@ import {
   getDocs,
   getDoc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -17,6 +18,7 @@ import {
 import { auth, db } from "./firebase";
 import Login from "./Login";
 import logo from "./assets/logo.png";
+
 
 const formularioInicial = {
   solicitante: "",
@@ -30,6 +32,62 @@ const formularioInicial = {
   justificativa: "",
 };
 
+function limparTexto(texto) {
+  return String(texto || "").trim();
+}
+
+
+function validarFormulario(form) {
+  const solicitante = limparTexto(form.solicitante);
+  const departamento = limparTexto(form.departamento);
+  const item = limparTexto(form.item);
+  const justificativa = limparTexto(form.justificativa);
+
+  if (!justificativa) return "Informe a justificativa.";
+
+  const quantidade = Number(form.quantidade);
+
+  if (!Number.isFinite(quantidade) || quantidade <= 0) {
+    return "Informe uma quantidade válida.";
+  }
+
+  if (!limparTexto(form.linkProduto1)) {
+    return "Informe o link do produto 1.";
+  }
+
+  if (solicitante.length > 100) return "Nome do solicitante muito longo.";
+  if (departamento.length > 100) return "Departamento muito longo.";
+  if (!solicitante) return "Informe o solicitante.";
+  if (!departamento) return "Informe o departamento.";
+
+  if (item.length < 3) {
+    return "Descreva o item com pelo menos 3 caracteres.";
+  }
+
+  if (item.length > 200) {
+    return "Descrição muito longa. Máximo de 200 caracteres.";
+  }
+
+  if (justificativa.length > 500) {
+    return "Justificativa muito longa. Máximo de 500 caracteres.";
+  }
+
+  if (!form.data) {
+    return "Informe o prazo.";
+  }
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const prazo = new Date(`${form.data}T00:00:00`);
+
+  if (prazo < hoje) {
+    return "O prazo não pode ser uma data no passado.";
+  }
+
+  return null;
+}
+
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
@@ -38,21 +96,32 @@ function App() {
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("Todos");
-  const [filtroPrioridade, setFiltroPrioridade] = useState("Todas");
-  const [filtroDepartamento, setFiltroDepartamento] = useState("Todos");
+  const filtroStatus = "Todos";
+  const filtroPrioridade = "Todas";
+  const filtroDepartamento = "Todos";
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
   const [formulario, setFormulario] = useState(formularioInicial);
+  const [role, setRole] = useState("funcionario");
+
+  const [colaboradores, setColaboradores] = useState([]);
+  const [carregandoColaboradores, setCarregandoColaboradores] = useState(false);
+  const [rolesEditados, setRolesEditados] = useState({});
+  const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState(null);
+  const [statusEditados, setStatusEditados] = useState({});
+  const [mensagensColaboradores, setMensagensColaboradores] = useState({});
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
-  const isMisael = emailLogado === "m.castro@oliv-e.health";
-  const isLucas = emailLogado === "l.andrade@oliv-e.health";
-  const isJoao = emailLogado === "j.furlan@oliv-e.health";
+  const isAdminFull = role === "admin_full";
+  const isAdmin = role === "admin" || role === "admin_full";
+  const isAprovador = role === "aprovador";
+  const isComprador = role === "comprador";
+  const podeAprovar = isAprovador || isAdminFull;
+  const podeComprar = isComprador || isAdminFull;
+  const podeExcluir = isAprovador || isAdminFull;
 
-  const isAdmin = isMisael || isLucas || isJoao;
-
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       const cadastroEmAndamento =
@@ -62,23 +131,89 @@ function App() {
         if (user) {
           await signOut(auth);
         }
+
         setUsuario(null);
+        setRole("funcionario");
         setCarregando(false);
         return;
       }
 
-      setUsuario(user || null);
-      setCarregando(false);
-    });
+    if (!user) {
+        setUsuario(null);
+        setRole("funcionario");
+        setCarregando(false);
+        return;
+    }
 
-    return () => unsubscribe();
-  }, []);
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          email: user.email,
+          role: "funcionario",
+          ativo: true,
+          createdAt: serverTimestamp(),
+        });
+        
+        setRole("funcionario");
+      } else {
+        const dadosUsuario = docSnap.data();
+
+        if (dadosUsuario.ativo === false) {
+          alert("Seu acesso ao portal está desativado.");
+          await signOut(auth);
+          setUsuario(null);
+          setRole("funcionario");
+          return;
+        }
+
+        setRole(dadosUsuario.role || "funcionario");
+      }
+
+      setUsuario(user);
+    } catch (error) {
+      console.error("Erro ao buscar usuário:", error);
+      setUsuario(user);
+      setRole("funcionario");
+    } finally {
+      setCarregando(false);
+    }
+  });
+
+  return () => unsubscribe();    
+}, []);
+
+  const buscarColaboradores = useCallback(async function buscarColaboradores() {
+  if (!isAdminFull) return;
+
+  setCarregandoColaboradores(true);
+
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+
+    const lista = snapshot.docs.map((d) => ({
+      uid: d.id,
+      email: d.data().email || "",
+      role: d.data().role || "funcionario",
+      ativo: d.data().ativo !== false,
+    }));
+
+    setColaboradores(lista);
+  } catch (error) {
+    console.error("Erro ao buscar colaboradores:", error);
+    alert("Erro ao buscar colaboradores.");
+  } finally {
+    setCarregandoColaboradores(false);
+  }
+  }, [isAdminFull]);
 
   useEffect(() => {
     if (usuario) buscarSolicitacoes();
     else setSolicitacoes([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, isAdmin]);
+  }, [usuario, role]);
 
   async function buscarSolicitacoes() {
     if (!usuario) return;
@@ -87,15 +222,15 @@ function App() {
     try {
       let q;
 
-  if (isLucas) {
+  if (isAprovador || isAdminFull) {
     q = query(
     collection(db, "purchase_requests"),
     orderBy("data_criacao", "desc")
   );
-  } else if (isJoao) {
+  } else if (isComprador) {
     q = query(
       collection(db, "purchase_requests"),
-      where("aprovada_lucas", "==", true),
+      where("aprovada_aprovador", "==", true),
       orderBy("data_criacao", "desc")
     );
   } else {
@@ -130,17 +265,17 @@ function App() {
           motivoReprovacao: item.motivo_reprovacao || "",
           userId: item.user_id || "",
           userEmail: item.user_email || "",
-          aprovadaLucas: item.aprovada_lucas === true,
-          analiseLucasFinalizada: item.analise_lucas_finalizada === true,
+          aprovadaAprovador: item.aprovada_aprovador === true,
+          analiseAprovadorFinalizada: item.analise_aprovador_finalizada === true,
         };
       });
 
       setSolicitacoes(
-        isLucas
+        isAprovador
           ? dadosTratados.filter(
               (s) =>
-                !s.aprovadaLucas &&
-                !s.analiseLucasFinalizada &&
+                !s.aprovadaAprovador &&
+                !s.analiseAprovadorFinalizada &&
                 !["Aprovada", "Reprovada", "Comprado"].includes(s.status)
             )
           : dadosTratados
@@ -155,6 +290,12 @@ function App() {
       setCarregando(false);
     }
   }
+
+  useEffect(() => {
+    if (paginaAtiva === "colaboradores" && isAdminFull) {
+      buscarColaboradores();
+    }
+  }, [paginaAtiva, isAdminFull, buscarColaboradores]);
 
   function alterarFormulario(e) {
     const { name, value } = e.target;
@@ -171,30 +312,37 @@ function App() {
     const solicitacaoDoUsuario =
       emailSolicitante === emailLogado || s.userId === usuario?.uid;
     const analiseAindaAberta =
-      !s.analiseLucasFinalizada &&
-      !s.aprovadaLucas &&
+      !s.analiseAprovadorFinalizada &&
+      !s.aprovadaAprovador &&
       !["Aprovada", "Comprado"].includes(s.status);
 
-    return isLucas || (solicitacaoDoUsuario && analiseAindaAberta);
+    return isAprovador || (solicitacaoDoUsuario && analiseAindaAberta);
   }
 
   async function enviarSolicitacao(e) {
     e.preventDefault();
     if (!usuario) return alert("Você precisa estar logado.");
 
+    const erro = validarFormulario(formulario);
+
+  if (erro) {
+    alert(erro);
+  return;
+  }
+
     setSalvando(true);
 
-    const payload = {
-      solicitante: formulario.solicitante,
-      departamento: formulario.departamento,
-      item: formulario.item,
-      quantidade: Number(formulario.quantidade),
-      prioridade: formulario.prioridade,
-      link_produto_1: formulario.linkProduto1,
-      link_produto_2: formulario.linkProduto2 || "",
-      data: formulario.data || null,
-      justificativa: formulario.justificativa,
-    };
+  const payload = {
+    solicitante: limparTexto(formulario.solicitante),
+    departamento: limparTexto(formulario.departamento),
+    item: limparTexto(formulario.item),
+    quantidade: Number(formulario.quantidade),
+    prioridade: formulario.prioridade,
+    link_produto_1: limparTexto(formulario.linkProduto1),
+    link_produto_2: limparTexto(formulario.linkProduto2),
+    data: formulario.data || null,
+    justificativa: limparTexto(formulario.justificativa),
+  };
 
     try {
       if (idEmEdicao) {
@@ -212,7 +360,7 @@ function App() {
           ...payload,
           status: "Pendente",
           motivo_reprovacao: "",
-          analise_lucas_finalizada: false,
+          analise_aprovador_finalizada: false,
           user_id: usuario.uid,
           user_email: usuario.email,
           data_criacao: serverTimestamp(),
@@ -226,19 +374,19 @@ function App() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              solicitante: formulario.solicitante,
-              departamento: formulario.departamento,
-              item: formulario.item,
-              quantidade: Number(formulario.quantidade),
-              prioridade: formulario.prioridade,
-              linkProduto1: formulario.linkProduto1,
-              linkProduto2: formulario.linkProduto2 || "",
-              data: formulario.data || "",
-              justificativa: formulario.justificativa,
-              idSolicitacao: docRef.id,
-              linkAnalise,
-            }),
+      body: JSON.stringify({
+        solicitante: limparTexto(formulario.solicitante),
+        departamento: limparTexto(formulario.departamento),
+        item: limparTexto(formulario.item),
+        quantidade: Number(formulario.quantidade),
+        prioridade: limparTexto(formulario.prioridade),
+        linkProduto1: limparTexto(formulario.linkProduto1),
+        linkProduto2: limparTexto(formulario.linkProduto2),
+        data: formulario.data || "",
+        justificativa: limparTexto(formulario.justificativa),
+        idSolicitacao: docRef.id,
+        linkAnalise,
+        }),
           });
 
           if (!respostaSlack.ok) {
@@ -318,22 +466,22 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
-    const lucasPodeAlterar = isLucas;
+    const aprovadorPodeAlterar = podeAprovar;
 
-    const misaelOuJoaoPodeAlterar =
-      isJoao &&
-      (novoStatus === "Comprado" || novoStatus === "Reprovada");
+    const compradorPodeAlterar = 
+    podeComprar && 
+    (novoStatus === "Comprado" || novoStatus === "Reprovada");
 
-    if (!lucasPodeAlterar && !misaelOuJoaoPodeAlterar) {
+    if (!aprovadorPodeAlterar && !compradorPodeAlterar) {
       alert("Você não tem permissão para alterar o status.");
       return;
     }
 
-    const analiseFinalizadaLucas =
-      isLucas && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
+    const analiseFinalizadaAprovador =
+      podeAprovar && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
     const solicitacaoAtual = solicitacoes.find((s) => s.id === id);
 
-    if (analiseFinalizadaLucas) {
+    if (analiseFinalizadaAprovador) {
       const acao = novoStatus === "Aprovada" ? "aprovar" : "reprovar";
       const nomeSolicitacao = solicitacaoAtual?.item
         ? ` "${solicitacaoAtual.item}"`
@@ -360,22 +508,17 @@ function App() {
         motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
       };
 
-      if (novoStatus === "Aprovada" && isLucas) {
-        dadosAtualizacao.aprovada_lucas = true;
+      if (novoStatus === "Aprovada" && podeAprovar) {
+        dadosAtualizacao.aprovada_aprovador = true;
       }
 
-      if (analiseFinalizadaLucas) {
-        dadosAtualizacao.analise_lucas_finalizada = true;
+      if (analiseFinalizadaAprovador) {
+        dadosAtualizacao.analise_aprovador_finalizada = true;
       }
 
       await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
 
-      if (analiseFinalizadaLucas) {
-        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
-        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
-      }
-
-      if (novoStatus === "Aprovada" && isLucas) {
+      if (novoStatus === "Aprovada" && podeAprovar) {
         const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
         const dadosAtualizados = snapAtualizado.exists()
           ? snapAtualizado.data()
@@ -416,14 +559,83 @@ function App() {
           }
         }
       }
+      
+      const deveRemoverDaLista =
+        analiseFinalizadaAprovador && isAprovador && !isAdminFull;
 
-      await buscarSolicitacoes();
+      if (deveRemoverDaLista) {
+        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
+        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
+      } else {
+        setSolicitacoes((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                ...s,
+                status: novoStatus,
+                motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
+                aprovadaAprovador:
+                  novoStatus === "Aprovada" && podeAprovar
+                    ? true
+                    : s.aprovadaAprovador,
+                analiseAprovadorFinalizada:
+                  analiseFinalizadaAprovador
+                    ? true
+                    : s.analiseAprovadorFinalizada,
+              }
+            : s
+          )
+        );
+      }
+
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
     }
   }
 
+
+  async function salvarColaborador(uid, novoRole, ativo) {
+    if (!isAdminFull) return; 
+
+    try {
+      await updateDoc(doc(db, "users", uid), {
+        role: novoRole,
+        ativo,
+      });
+
+      setColaboradores((prev) =>
+        prev.map((c) =>
+          c.uid === uid ? { ...c, role: novoRole, ativo } : c
+        )
+      );
+
+      setRolesEditados((prev) => {
+        const novo = { ...prev };
+        delete novo[uid];
+        return novo;
+      });
+
+      setStatusEditados((prev) => {
+        const novo = { ...prev };
+        delete novo[uid];
+        return novo;
+      });
+
+      setMensagensColaboradores((prev) => ({
+        ...prev,
+        [uid]: "Salvo com sucesso!",
+      }));
+
+      setColaboradorEmEdicao(null);
+
+    } catch (error) {
+      console.error("Erro ao salvar colaborador:",error);
+      alert("Erro ao salvar colaborador.");
+    }
+  }
+
+  
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
@@ -441,11 +653,6 @@ function App() {
       return bateBusca && bateStatus && batePrioridade && bateDepartamento;
     });
   }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
-
-  const departamentosUnicos = useMemo(
-    () => [...new Set(solicitacoes.map((s) => s.departamento).filter(Boolean))],
-    [solicitacoes]
-  );
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -469,12 +676,17 @@ function App() {
             Fazer uma Solicitação
           </button>
           <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
-            {isLucas
+            {isAprovador
               ? "Todas as solicitações"
-              : isMisael || isJoao
+              : isAdminFull || isComprador
               ? "Todas as Solicitações"
               : "Minhas solicitações"}
           </button>
+          {isAdminFull && (
+            <button className="menu-item" onClick={() => setPaginaAtiva("colaboradores")}>
+              Colaboradores
+            </button>
+          )}
         </nav>
       </aside>
 
@@ -496,6 +708,91 @@ function App() {
             Usuário logado: <strong>{usuario.email}</strong>
             {isAdmin && <strong> — Admin</strong>}
           </p>
+
+          {paginaAtiva === "colaboradores" && isAdminFull && (
+          <div className="bloco">
+          <h2>Colaboradores</h2>
+
+          {carregandoColaboradores ? (
+            <p>Carregando...</p>
+            ) : (
+            <div className="lista">
+              {colaboradores.map((colaborador) => (
+                <article key={colaborador.uid} className="item-lista">
+                  <div className="colaborador-cabecalho">
+                  <div>
+                   <strong>{colaborador.email || colaborador.uid}</strong>
+                   <p>{colaborador.ativo ? "Ativo" : "Desativado"}</p>
+                  </div>
+
+                  <button
+                   type="button"
+                   className="botao-editar-colaborador"
+                  onClick={() => 
+                    setColaboradorEmEdicao((uidAtual) =>
+                      uidAtual === colaborador.uid ? null : colaborador.uid
+                    )
+                  }
+                  title="Editar colaborador"
+                  >
+                    <i className="fi fi-rr-edit"></i>
+                  </button>
+                </div> 
+
+                  {colaboradorEmEdicao === colaborador.uid && (
+                   <>
+                  <select
+                   value={rolesEditados[colaborador.uid] || colaborador.role}
+                   onChange={(e) =>
+                    setRolesEditados((prev) => ({
+                    ...prev,
+                    [colaborador.uid]: e.target.value,
+                    }))
+                    }
+                  >
+                    <option value="funcionario">Funcionário</option>
+                    <option value="admin_full">Admin Full</option>
+                    <option value="aprovador">Aprovador</option>
+                    <option value="comprador">Comprador</option>
+                  </select>
+
+                    <button
+                     type="button"
+                     onClick={() =>
+                      setStatusEditados((prev) => ({
+                      ...prev,
+                     [colaborador.uid]: !(prev[colaborador.uid] ?? colaborador.ativo),
+                      }))
+                      }
+                    >
+                      {(statusEditados[colaborador.uid] ?? colaborador.ativo)
+                      ? "Desativar"
+                      : "Ativar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        salvarColaborador(
+                          colaborador.uid,
+                          rolesEditados[colaborador.uid] || colaborador.role,
+                          statusEditados[colaborador.uid] ?? colaborador.ativo
+                        )
+                      }
+                    >
+                      Salvar
+                    </button>
+                  </>
+                  )}
+                  {mensagensColaboradores[colaborador.uid] && (
+                  <p>{mensagensColaboradores[colaborador.uid]}</p>
+                  )}
+                </article>
+                ))}
+                </div>
+                )}
+                </div>
+          )}
 
           {paginaAtiva === "dashboard" && (
             <div className="cards">
@@ -572,9 +869,9 @@ function App() {
                   value={formulario.prioridade}
                   onChange={alterarFormulario}
                 >
-                  <option>Prioridade Alta</option>
-                  <option>Prioridade Média</option>
-                  <option>Prioridade Baixa</option>
+                  <option value="Alta">Prioridade Alta</option>
+                  <option value="Média">Prioridade Média</option>
+                  <option value="Baixa">Prioridade Baixa</option>
                 </select>
 
                 <input
@@ -632,9 +929,9 @@ function App() {
           {paginaAtiva === "minhas" && (
             <div className="bloco">
               <h2>
-               {isLucas
+               {isAprovador
                 ? "Todas as solicitações"
-                : isMisael || isJoao
+                : isAdminFull || isComprador
                 ? "Todas as solicitações"
                 : "Minhas solicitações"}
               </h2>
@@ -786,7 +1083,7 @@ function App() {
                                 </button>
                               )}
 
-                              {isLucas && (
+                              {podeAprovar && (
                                 <>
                                   <button onClick={() => mudarStatus(s.id, "Pendente")}>
                                     Pendente
@@ -806,7 +1103,7 @@ function App() {
                                 </>
                               )}
 
-                              {isJoao && (
+                              {podeComprar && !podeAprovar && (
                                 <>
                                   <button onClick={() => mudarStatus(s.id, "Comprado")}>
                                     Comprado
@@ -817,7 +1114,7 @@ function App() {
                                 </>
                               )}
 
-                              {isLucas && (
+                              {podeExcluir && (
                                 <button
                                   onClick={() => excluirSolicitacao(s.id)}
                                   style={{ background: "#dc2626" }}

@@ -1,4 +1,23 @@
+function escaparSlack(texto) {
+  return String(texto || "-")
+    .trim()
+    .replaceAll("*", "\\*")
+    .replaceAll("_", "\\_")
+    .replaceAll("`", "\\`");
+}
+
 export default async function handler(req, res) {
+  const origemPermitida = 
+    process.env.PORTAL_URL || "https://portal-compras-five.vercel.app";
+
+  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).end();
   }
@@ -6,7 +25,13 @@ export default async function handler(req, res) {
   try {
     const data = req.body || {};
 
-    const linkPortal = "https://portal-compras-five.vercel.app/";
+    const linkPortal = process.env.PORTAL_URL;
+    const compradorId = process.env.SLACK_COMPRADOR_USER_ID;
+
+    if (!process.env.SLACK_BOT_TOKEN || !compradorId || !linkPortal) {
+      return res.status(500).json({ error: "SLACK_BOT_TOKEN, SLACK_COMPRADOR_USER_ID ou PORTAL_URL não configurado" });
+    }
+
     const linkProduto1 = data.linkProduto1 || data.link_produto_1;
     const linkProduto2 = data.linkProduto2 || data.link_produto_2;
     
@@ -17,15 +42,15 @@ export default async function handler(req, res) {
 
     const mensagem =
       `*SOLICITAÇÃO APROVADA* \n\n` +
-      `*Item:* ${data.item}\n` +
-      `*Solicitante:* ${data.solicitante}\n` +
-      `*Departamento:* ${data.departamento}\n` +
+      `*Item:* ${escaparSlack(data.item)}\n` +
+      `*Solicitante:* ${escaparSlack(data.solicitante)}\n` +
+      `*Departamento:* ${escaparSlack(data.departamento)}\n` +
       `*Quantidade:* ${data.quantidade}\n` +
-      `*Prioridade:* ${data.prioridade}\n` +
+      `*Prioridade:* ${escaparSlack(data.prioridade)}\n` +
       `*Prazo:* ${data.data || "-"}\n` +
       `*Link do produto 1:* ${link1}\n`+
       `*Link do produto 2:* ${link2}\n`+
-      `*Justificativa:* ${data.justificativa || "-"}\n`+
+      `*Justificativa:* ${escaparSlack(data.justificativa) || "-"}\n`+
       `\n*portal de solicitações:* ${linkPortal}`;
 
     const response = await fetch("https://slack.com/api/chat.postMessage", {
@@ -35,7 +60,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        channel: "U010UDZ4XGD", //meu id
+        channel: compradorId,
         text: mensagem,
       }),
     });

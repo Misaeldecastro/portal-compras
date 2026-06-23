@@ -1,7 +1,18 @@
 import { enviarMensagemParaUsuario } from "./slack-utils.js";
 
+function escaparSlack(texto) {
+  return String(texto || "-")
+    .trim()
+    .replaceAll("*", "\\*")
+    .replaceAll("_", "\\_")
+    .replaceAll("`", "\\`");
+}
+
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origemPermitida = 
+    process.env.PORTAL_URL || "https://portal-compras-five.vercel.app";
+
+  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -18,34 +29,29 @@ export default async function handler(req, res) {
       solicitante,
       departamento,
       item,
-      quantidade,
-      prioridade,
       justificativa,
-      idSolicitacao,
-      linkAnalise,
     } = req.body || {};
 
-    const lucasId = process.env.SLACK_LUCAS_USER_ID;
+    const aprovadorId = process.env.SLACK_APROVADOR_USER_ID;
+    const linkPortal = process.env.PORTAL_URL;
 
-    if (!lucasId) {
-      return res.status(500).json({ error: "SLACK_LUCAS_USER_ID não configurado" });
+    if (!aprovadorId || !linkPortal) {
+      return res.status(500).json({ error: "SLACK_APROVADOR_USER_ID ou PORTAL_URL não configurado" });
     }
 
-    const linkPortal = "https://portal-compras-five.vercel.app/";
+  const mensagem = 
+  `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
+  `*Justificativa / Descrição:* ${escaparSlack(justificativa)}\n` +
+  `*Solicitante:* ${escaparSlack(solicitante)}\n` +
+  `*Departamento:* ${escaparSlack(departamento)}\n` +
+  `*Item:* ${escaparSlack(item)}\n` +
+  `\n*Acessar portal de solicitações:* ${linkPortal}`;
 
-  const mensagem =
-    `*NOVA SOLICITAÇÃO DE COMPRAS*\n\n` +
-    `*Justificativa / Descrição:* ${justificativa || "-"}\n` +
-    `*Solicitante:* ${solicitante || "-"}\n` +
-    `*Departamento:* ${departamento || "-"}\n` +
-    `*Item:* ${item || "-"}\n` +
-    `\n*Acessar portal de solicitações:* ${linkPortal}`;
-
-    await enviarMensagemParaUsuario(lucasId, mensagem);
+    await enviarMensagemParaUsuario(aprovadorId, mensagem);
 
     return res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Erro ao enviar para o Lucas:", error);
+    console.error("Erro ao enviar para o Aprovador:", error);
     return res.status(500).json({
       error: "Erro interno",
       details: error.message,
