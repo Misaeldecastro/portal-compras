@@ -92,10 +92,16 @@ function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [paginaAtiva, setPaginaAtiva] = useState("dashboard");
+  const [paginaAnterior, setPaginaAnterior] = useState(null);
+  const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
+  const filtroStatus = "Todos";
+  const filtroPrioridade = "Todas";
+  const filtroDepartamento = "Todos";
+  const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
@@ -103,11 +109,57 @@ function App() {
   const [role, setRole] = useState("funcionario");
 
   const [colaboradores, setColaboradores] = useState([]);
+
+  const formularioSujo = useMemo(() => {
+    if (idEmEdicao !== null) return true;
+    if (pedidoBaseadoEmReprovada) return true;
+    return (
+      formulario.solicitante !== formularioInicial.solicitante ||
+      formulario.departamento !== formularioInicial.departamento ||
+      formulario.item !== formularioInicial.item ||
+      formulario.quantidade !== formularioInicial.quantidade ||
+      formulario.prioridade !== formularioInicial.prioridade ||
+      formulario.linkProduto1 !== formularioInicial.linkProduto1 ||
+      formulario.linkProduto2 !== formularioInicial.linkProduto2 ||
+      formulario.data !== formularioInicial.data ||
+      formulario.justificativa !== formularioInicial.justificativa
+    );
+  }, [formulario, idEmEdicao, pedidoBaseadoEmReprovada]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (!formularioSujo) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const handlePopState = () => {
+      if (!formularioSujo) return;
+      const confirmado = window.confirm(
+        "Tem certeza que deseja sair desta solicitação e limpar tudo?"
+      );
+      if (!confirmado) {
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+      limparFormulario();
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [formularioSujo]);
   const [carregandoColaboradores, setCarregandoColaboradores] = useState(false);
   const [rolesEditados, setRolesEditados] = useState({});
   const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState(null);
   const [statusEditados, setStatusEditados] = useState({});
   const [mensagensColaboradores, setMensagensColaboradores] = useState({});
+
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
   const isAdminFull = role === "admin_full";
@@ -299,9 +351,42 @@ function App() {
     setFormulario((prev) => ({ ...prev, [name]: value }));
   }
 
-  function limparFormulario() {
+  function limparFormulario(options = {}) {
+    const { keepNovaDireta = false } = options;
+
     setFormulario(formularioInicial);
     setIdEmEdicao(null);
+    setPedidoBaseadoEmReprovada(false);
+
+    if (!keepNovaDireta) {
+      setNovaDireta(false);
+      setPaginaAnterior(null);
+    }
+  }
+
+  function confirmarSaidaFormulario() {
+    if (!formularioSujo) return true;
+    const confirmado = window.confirm(
+      "Tem certeza que deseja sair desta solicitação e limpar tudo?"
+    );
+    if (!confirmado) return false;
+    limparFormulario();
+    return true;
+  }
+
+  function navegarParaPagina(pagina) {
+    if (!confirmarSaidaFormulario()) return;
+    if (pagina === "nova") {
+      setNovaDireta(true);
+      setPaginaAnterior(null);
+    }
+    setPaginaAtiva(pagina);
+  }
+
+  async function sair() {
+    if (!confirmarSaidaFormulario()) return;
+    await signOut(auth);
+    setUsuario(null);
   }
 
   function podeEditarSolicitacao(s) {
@@ -415,6 +500,7 @@ function App() {
     }
 
     setIdEmEdicao(s.id);
+    setNovaDireta(false);
     setFormulario({
       solicitante: s.solicitante,
       departamento: s.departamento,
@@ -426,12 +512,15 @@ function App() {
       data: s.data,
       justificativa: s.justificativa,
     });
+    setPaginaAnterior(paginaAtiva);
     setPaginaAtiva("nova");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function pedirNovamente(s) {
     setIdEmEdicao(null);
+    setNovaDireta(false);
+    setPedidoBaseadoEmReprovada(s.status === "Reprovada");
 
     setFormulario({
       solicitante: s.solicitante,
@@ -441,10 +530,11 @@ function App() {
       prioridade: s.prioridade,
       linkProduto1: s.linkProduto1,
       linkProduto2: s.linkProduto2,
-      data: s.data || "",
+      data: "",
       justificativa: s.justificativa,
     });
 
+    setPaginaAnterior(paginaAtiva);
     setPaginaAtiva("nova");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -669,13 +759,13 @@ function App() {
         <h2 className="logo">Oliv-e Saúde</h2>
 
         <nav className="menu">
-          <button className="menu-item" onClick={() => setPaginaAtiva("dashboard")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("dashboard")}>
             Dashboard
           </button>
-          <button className="menu-item" onClick={() => setPaginaAtiva("nova")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("nova")}>
             Fazer uma Solicitação
           </button>
-          <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("minhas")}>
             {isAprovador
               ? "Todas as solicitações"
               : isAdminFull || isComprador
@@ -683,7 +773,7 @@ function App() {
               : "Minhas solicitações"}
           </button>
           {isAdminFull && (
-            <button className="menu-item" onClick={() => setPaginaAtiva("colaboradores")}>
+            <button className="menu-item" onClick={() => navegarParaPagina("colaboradores")}>
               Colaboradores
             </button>
           )}
@@ -695,8 +785,7 @@ function App() {
           <h1>Portal de Solicitações</h1>
           <button
             onClick={async () => {
-              await signOut(auth);
-              setUsuario(null);
+              await sair();
             }}
           >
             Sair
@@ -823,6 +912,12 @@ function App() {
             <div className="bloco">
               <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
 
+              {pedidoBaseadoEmReprovada && (
+                <p>
+                  <strong>Atenção! Esta solicitação é baseada em uma solicitação reprovada. Revise as informações e envie novamente.</strong>
+                </p>
+              )}
+
               <form onSubmit={enviarSolicitacao} className="formulario">
                 <textarea
                   name="justificativa"
@@ -907,20 +1002,38 @@ function App() {
                   <button type="submit" disabled={salvando}>
                     {salvando
                       ? "Salvando..."
+                      : pedidoBaseadoEmReprovada
+                      ? "Criar nova solicitação"
                       : idEmEdicao
                       ? "Salvar edição"
                       : "Enviar solicitação"}
                   </button>
 
-                  {idEmEdicao && (
                     <button
                       type="button"
-                      onClick={limparFormulario}
+                      onClick={() => {
+                        if (!formularioSujo) {
+                          alert("Esse formulário já está limpo");
+                          return;
+                        }
+
+                        if (!window.confirm("Tem certeza que deseja limpar o formulário?")) return;
+
+                        limparFormulario({ keepNovaDireta: true });
+
+                        if (!novaDireta) {
+                          setPaginaAtiva(paginaAnterior || "minhas");
+                          setPaginaAnterior(null);
+                        }
+                      }}
                       className="botao-secundario"
                     >
-                      Cancelar edição
+                      {idEmEdicao
+                        ? "Cancelar edição"
+                        : novaDireta
+                        ? "Limpar formulário"
+                        : "Cancelar"}
                     </button>
-                  )}
                 </div>
               </form>
             </div>
