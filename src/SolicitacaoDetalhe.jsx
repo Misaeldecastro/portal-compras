@@ -15,7 +15,7 @@ export default function SolicitacaoDetalhe() {
       if (!user) {
         navigate("/");
         return;
-      } 
+      }
 
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -32,7 +32,7 @@ export default function SolicitacaoDetalhe() {
         setSolicitacao({ id: snap.id, ...snap.data() });
       }
     });
-    
+
     return () => unsubscribe();
   }, [id, navigate]);
 
