@@ -524,65 +524,85 @@ function App() {
         return;
       }
 
-      if (analiseFinalizadaAprovador) {
+      if (novoStatus === "Aprovada" && podeAprovar) {
+        try {
+          const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
+
+          const dadosAtualizados = snapAtualizado.exists()
+            ? snapAtualizado.data()
+            : null;
+
+          const solicitacaoParaSlack = dadosAtualizados
+            ? {
+                id,
+                solicitante: dadosAtualizados.solicitante || "",
+                departamento: dadosAtualizados.departamento || "",
+                item: dadosAtualizados.item || "",
+                quantidade: dadosAtualizados.quantidade || 0,
+                prioridade: dadosAtualizados.prioridade || "",
+                linkProduto1: dadosAtualizados.link_produto_1 || "",
+                linkProduto2: dadosAtualizados.link_produto_2 || "",
+                data: dadosAtualizados.data || "",
+                justificativa: dadosAtualizados.justificativa || "",
+                status: novoStatus,
+              }
+            : solicitacaoAtual
+            ? {
+                ...solicitacaoAtual,
+                status: novoStatus,
+              }
+            : null;
+
+          if (solicitacaoParaSlack) {
+            const respostaSlack = await fetch("/api/slack-aprovado", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(solicitacaoParaSlack),
+            });
+
+            if (!respostaSlack.ok) {
+              throw new Error("Slack respondeu com erro");
+            }
+          }
+        } catch (erro) {
+          alert("Solicitação aprovada, mas a notificação Slack falhou. Avise o Comprador manualmente.");
+          console.error(erro);
+        }
+      }
+
+      const deveRemoverDaLista =
+        analiseFinalizadaAprovador && isAprovador && !isAdminFull;
+
+      if (deveRemoverDaLista) {
         setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
         setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
+      } else {
+        setSolicitacoes((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  status: novoStatus,
+                  motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
+                  aprovadaAprovador:
+                    novoStatus === "Aprovada" && podeAprovar
+                      ? true
+                      : s.aprovadaAprovador,
+                  analiseAprovadorFinalizada: analiseFinalizadaAprovador
+                    ? true
+                    : s.analiseAprovadorFinalizada,
+                }
+              : s
+          )
+        );
       }
-
-      if (novoStatus === "Aprovada" && podeAprovar) {
-      try{
-        const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
-
-        const dadosAtualizados = snapAtualizado.exists()
-          ? snapAtualizado.data()
-          : null;
-
-        const solicitacaoParaSlack = dadosAtualizados
-          ? {
-              id,
-              solicitante: dadosAtualizados.solicitante || "",
-              departamento: dadosAtualizados.departamento || "",
-              item: dadosAtualizados.item || "",
-              quantidade: dadosAtualizados.quantidade || 0,
-              prioridade: dadosAtualizados.prioridade || "",
-              linkProduto1: dadosAtualizados.link_produto_1 || "",
-              linkProduto2: dadosAtualizados.link_produto_2 || "",
-              data: dadosAtualizados.data || "",
-              justificativa: dadosAtualizados.justificativa || "",
-              status: novoStatus,
-            }
-          : solicitacaoAtual
-          ? {
-              ...solicitacaoAtual,
-              status: novoStatus,
-            }
-          : null;
-
-        if (solicitacaoParaSlack) {
-          const respostaSlack = await fetch("/api/slack-aprovado", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(solicitacaoParaSlack),
-          });
-
-          if (!respostaSlack.ok) {
-            throw new Error("Slack respondeu com erro");
-          }
-        }
-      } catch (erro) {
-        alert("Solicitação aprovada, mas a notificação Slack falhou. Avise o Comprador manualmente.");
-        console.error(erro);
-      }
+    } catch (error) {
+      alert("Erro ao alterar status");
+      console.error(error);
     }
-
-    await buscarSolicitacoes();
-  } catch (error) {
-    alert("Erro ao alterar status");
-    console.error(error);
   }
-}
 
 
   async function salvarColaborador(uid, novoRole, ativo) {
