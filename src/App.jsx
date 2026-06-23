@@ -605,11 +605,6 @@ function App() {
 
       await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
 
-      if (analiseFinalizadaAprovador) {
-        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
-        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
-      }
-
       if (novoStatus === "Aprovada" && podeAprovar) {
         const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
         const dadosAtualizados = snapAtualizado.exists()
@@ -652,7 +647,34 @@ function App() {
         }
       }
 
-      await buscarSolicitacoes();
+      const deveRemoverDaLista =
+        analiseFinalizadaAprovador && isAprovador && !isAdminFull;
+
+      if (deveRemoverDaLista) {
+        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
+        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
+      } else {
+        setSolicitacoes((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                ...s,
+                status: novoStatus,
+                motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
+                aprovadaAprovador:
+                  novoStatus === "Aprovada" && podeAprovar
+                    ? true
+                    : s.aprovadaAprovador,
+                analiseAprovadorFinalizada:
+                  analiseFinalizadaAprovador
+                    ? true
+                    : s.analiseAprovadorFinalizada,
+              }
+            : s
+          )
+        );
+      }
+
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
@@ -704,20 +726,14 @@ function App() {
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
-      const bateBusca =
+
+      return (
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto);
-
-      const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
-      const batePrioridade =
-        filtroPrioridade === "Todas" || s.prioridade === filtroPrioridade;
-      const bateDepartamento =
-        filtroDepartamento === "Todos" || s.departamento === filtroDepartamento;
-
-      return bateBusca && bateStatus && batePrioridade && bateDepartamento;
+        s.item.toLowerCase().includes(texto)
+      );
     });
-  }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
+  }, [solicitacoes, busca]);
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -1173,17 +1189,11 @@ function App() {
 
                               {podeAprovar && (
                                 <>
-                                  <button onClick={() => mudarStatus(s.id, "Pendente")}>
-                                    Pendente
-                                  </button>
                                   <button onClick={() => mudarStatus(s.id, "Em análise")}>
                                     Em análise
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Aprovada")}>
                                     Aprovar
-                                  </button>
-                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
-                                    Comprado
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Reprovada")}>
                                     Reprovar
@@ -1191,15 +1201,16 @@ function App() {
                                 </>
                               )}
 
-                              {podeComprar && !podeAprovar && (
-                                <>
+                              {(isComprador || isAdminFull) && (
                                   <button onClick={() => mudarStatus(s.id, "Comprado")}>
                                     Comprado
                                   </button>
-                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
-                                    Reprovar
-                                  </button>
-                                </>
+                              )}
+
+                              {isComprador && (
+                                <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                Reprovar
+                                </button>
                               )}
 
                               {podeExcluir && (
