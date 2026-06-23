@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       `*Prazo:* ${data.data || "-"}\n` +
       `*Link do produto 1:* ${link1}\n`+
       `*Link do produto 2:* ${link2}\n`+
-      `*Justificativa:* ${escaparSlack(data.justificativa) || "-"}\n`+
+      `*Justificativa:* ${escaparSlack(data.justificativa)}\n`+
       `\n*portal de solicitações:* ${linkPortal}`;
 
     const response = await fetch("https://slack.com/api/chat.postMessage", {
