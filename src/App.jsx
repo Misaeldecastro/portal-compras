@@ -92,6 +92,8 @@ function App() {
   const [usuario, setUsuario] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [paginaAtiva, setPaginaAtiva] = useState("dashboard");
+  const [paginaAnterior, setPaginaAnterior] = useState(null);
+  const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -99,6 +101,7 @@ function App() {
   const filtroStatus = "Todos";
   const filtroPrioridade = "Todas";
   const filtroDepartamento = "Todos";
+  const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
 
@@ -106,11 +109,57 @@ function App() {
   const [role, setRole] = useState("funcionario");
 
   const [colaboradores, setColaboradores] = useState([]);
+
+  const formularioSujo = useMemo(() => {
+    if (idEmEdicao !== null) return true;
+    if (pedidoBaseadoEmReprovada) return true;
+    return (
+      formulario.solicitante !== formularioInicial.solicitante ||
+      formulario.departamento !== formularioInicial.departamento ||
+      formulario.item !== formularioInicial.item ||
+      formulario.quantidade !== formularioInicial.quantidade ||
+      formulario.prioridade !== formularioInicial.prioridade ||
+      formulario.linkProduto1 !== formularioInicial.linkProduto1 ||
+      formulario.linkProduto2 !== formularioInicial.linkProduto2 ||
+      formulario.data !== formularioInicial.data ||
+      formulario.justificativa !== formularioInicial.justificativa
+    );
+  }, [formulario, idEmEdicao, pedidoBaseadoEmReprovada]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (!formularioSujo) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const handlePopState = () => {
+      if (!formularioSujo) return;
+      const confirmado = window.confirm(
+        "Tem certeza que deseja sair desta solicitação e limpar tudo?"
+      );
+      if (!confirmado) {
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+      limparFormulario();
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [formularioSujo]);
   const [carregandoColaboradores, setCarregandoColaboradores] = useState(false);
   const [rolesEditados, setRolesEditados] = useState({});
   const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState(null);
   const [statusEditados, setStatusEditados] = useState({});
   const [mensagensColaboradores, setMensagensColaboradores] = useState({});
+
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
   const isAdminFull = role === "admin_full";
@@ -302,9 +351,42 @@ function App() {
     setFormulario((prev) => ({ ...prev, [name]: value }));
   }
 
-  function limparFormulario() {
+  function limparFormulario(options = {}) {
+    const { keepNovaDireta = false } = options;
+
     setFormulario(formularioInicial);
     setIdEmEdicao(null);
+    setPedidoBaseadoEmReprovada(false);
+
+    if (!keepNovaDireta) {
+      setNovaDireta(false);
+      setPaginaAnterior(null);
+    }
+  }
+
+  function confirmarSaidaFormulario() {
+    if (!formularioSujo) return true;
+    const confirmado = window.confirm(
+      "Tem certeza que deseja sair desta solicitação e limpar tudo?"
+    );
+    if (!confirmado) return false;
+    limparFormulario();
+    return true;
+  }
+
+  function navegarParaPagina(pagina) {
+    if (!confirmarSaidaFormulario()) return;
+    if (pagina === "nova") {
+      setNovaDireta(true);
+      setPaginaAnterior(null);
+    }
+    setPaginaAtiva(pagina);
+  }
+
+  async function sair() {
+    if (!confirmarSaidaFormulario()) return;
+    await signOut(auth);
+    setUsuario(null);
   }
 
   function podeEditarSolicitacao(s) {
@@ -418,6 +500,7 @@ function App() {
     }
 
     setIdEmEdicao(s.id);
+    setNovaDireta(false);
     setFormulario({
       solicitante: s.solicitante,
       departamento: s.departamento,
@@ -429,12 +512,15 @@ function App() {
       data: s.data,
       justificativa: s.justificativa,
     });
+    setPaginaAnterior(paginaAtiva);
     setPaginaAtiva("nova");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function pedirNovamente(s) {
     setIdEmEdicao(null);
+    setNovaDireta(false);
+    setPedidoBaseadoEmReprovada(s.status === "Reprovada");
 
     setFormulario({
       solicitante: s.solicitante,
@@ -444,10 +530,11 @@ function App() {
       prioridade: s.prioridade,
       linkProduto1: s.linkProduto1,
       linkProduto2: s.linkProduto2,
-      data: s.data || "",
+      data: "",
       justificativa: s.justificativa,
     });
 
+    setPaginaAnterior(paginaAtiva);
     setPaginaAtiva("nova");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -516,50 +603,61 @@ function App() {
         dadosAtualizacao.analise_aprovador_finalizada = true;
       }
 
-      await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
+      try {
+        await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
+      } catch (erro) {
+        alert("Erro ao salvar aprovação. Tente novamente.");
+        console.error(erro);
+        return;
+      }
 
       if (novoStatus === "Aprovada" && podeAprovar) {
-        const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
-        const dadosAtualizados = snapAtualizado.exists()
-          ? snapAtualizado.data()
-          : null;
-        const solicitacaoParaSlack = dadosAtualizados
-          ? {
-              id,
-              solicitante: dadosAtualizados.solicitante || "",
-              departamento: dadosAtualizados.departamento || "",
-              item: dadosAtualizados.item || "",
-              quantidade: dadosAtualizados.quantidade || 0,
-              prioridade: dadosAtualizados.prioridade || "",
-              linkProduto1: dadosAtualizados.link_produto_1 || "",
-              linkProduto2: dadosAtualizados.link_produto_2 || "",
-              data: dadosAtualizados.data || "",
-              justificativa: dadosAtualizados.justificativa || "",
-              status: novoStatus,
-            }
-          : solicitacaoAtual
-          ? {
-              ...solicitacaoAtual,
-              status: novoStatus,
-            }
-          : null;
+        try {
+          const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
 
-        if (solicitacaoParaSlack) {
-          const respostaSlack = await fetch("/api/slack-aprovado", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(solicitacaoParaSlack),
-          });
+          const dadosAtualizados = snapAtualizado.exists()
+            ? snapAtualizado.data()
+            : null;
 
-          if (!respostaSlack.ok) {
-            const erroTexto = await respostaSlack.text();
-            console.error("Erro ao enviar aprovação para slack:", erroTexto);
+          const solicitacaoParaSlack = dadosAtualizados
+            ? {
+                id,
+                solicitante: dadosAtualizados.solicitante || "",
+                departamento: dadosAtualizados.departamento || "",
+                item: dadosAtualizados.item || "",
+                quantidade: dadosAtualizados.quantidade || 0,
+                prioridade: dadosAtualizados.prioridade || "",
+                linkProduto1: dadosAtualizados.link_produto_1 || "",
+                linkProduto2: dadosAtualizados.link_produto_2 || "",
+                data: dadosAtualizados.data || "",
+                justificativa: dadosAtualizados.justificativa || "",
+                status: novoStatus,
+              }
+            : solicitacaoAtual
+            ? {
+                ...solicitacaoAtual,
+                status: novoStatus,
+              }
+            : null;
+
+          if (solicitacaoParaSlack) {
+            const respostaSlack = await fetch("/api/slack-aprovado", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(solicitacaoParaSlack),
+            });
+
+            if (!respostaSlack.ok) {
+              throw new Error("Slack respondeu com erro");
+            }
           }
+        } catch (erro) {
+          alert("Solicitação aprovada, mas a notificação Slack falhou. Avise o Comprador manualmente.");
+          console.error(erro);
         }
       }
-      
       const deveRemoverDaLista =
         analiseFinalizadaAprovador && isAprovador && !isAdminFull;
 
@@ -571,23 +669,21 @@ function App() {
           prev.map((s) =>
             s.id === id
               ? {
-                ...s,
-                status: novoStatus,
-                motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
-                aprovadaAprovador:
-                  novoStatus === "Aprovada" && podeAprovar
-                    ? true
-                    : s.aprovadaAprovador,
-                analiseAprovadorFinalizada:
-                  analiseFinalizadaAprovador
+                  ...s,
+                  status: novoStatus,
+                  motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
+                  aprovadaAprovador:
+                    novoStatus === "Aprovada" && podeAprovar
+                      ? true
+                      : s.aprovadaAprovador,
+                  analiseAprovadorFinalizada: analiseFinalizadaAprovador
                     ? true
                     : s.analiseAprovadorFinalizada,
-              }
-            : s
+                }
+              : s
           )
         );
       }
-
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
@@ -639,20 +735,14 @@ function App() {
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
-      const bateBusca =
+
+      return (
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto);
-
-      const bateStatus = filtroStatus === "Todos" || s.status === filtroStatus;
-      const batePrioridade =
-        filtroPrioridade === "Todas" || s.prioridade === filtroPrioridade;
-      const bateDepartamento =
-        filtroDepartamento === "Todos" || s.departamento === filtroDepartamento;
-
-      return bateBusca && bateStatus && batePrioridade && bateDepartamento;
+        s.item.toLowerCase().includes(texto)
+      );
     });
-  }, [solicitacoes, busca, filtroStatus, filtroPrioridade, filtroDepartamento]);
+  }, [solicitacoes, busca]);
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -669,13 +759,13 @@ function App() {
         <h2 className="logo">Oliv-e Saúde</h2>
 
         <nav className="menu">
-          <button className="menu-item" onClick={() => setPaginaAtiva("dashboard")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("dashboard")}>
             Dashboard
           </button>
-          <button className="menu-item" onClick={() => setPaginaAtiva("nova")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("nova")}>
             Fazer uma Solicitação
           </button>
-          <button className="menu-item" onClick={() => setPaginaAtiva("minhas")}>
+          <button className="menu-item" onClick={() => navegarParaPagina("minhas")}>
             {isAprovador
               ? "Todas as solicitações"
               : isAdminFull || isComprador
@@ -683,7 +773,7 @@ function App() {
               : "Minhas solicitações"}
           </button>
           {isAdminFull && (
-            <button className="menu-item" onClick={() => setPaginaAtiva("colaboradores")}>
+            <button className="menu-item" onClick={() => navegarParaPagina("colaboradores")}>
               Colaboradores
             </button>
           )}
@@ -695,8 +785,7 @@ function App() {
           <h1>Portal de Solicitações</h1>
           <button
             onClick={async () => {
-              await signOut(auth);
-              setUsuario(null);
+              await sair();
             }}
           >
             Sair
@@ -823,6 +912,12 @@ function App() {
             <div className="bloco">
               <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
 
+              {pedidoBaseadoEmReprovada && (
+                <p>
+                  <strong>Atenção! Esta solicitação é baseada em uma solicitação reprovada. Revise as informações e envie novamente.</strong>
+                </p>
+              )}
+
               <form onSubmit={enviarSolicitacao} className="formulario">
                 <textarea
                   name="justificativa"
@@ -907,20 +1002,38 @@ function App() {
                   <button type="submit" disabled={salvando}>
                     {salvando
                       ? "Salvando..."
+                      : pedidoBaseadoEmReprovada
+                      ? "Criar nova solicitação"
                       : idEmEdicao
                       ? "Salvar edição"
                       : "Enviar solicitação"}
                   </button>
 
-                  {idEmEdicao && (
                     <button
                       type="button"
-                      onClick={limparFormulario}
+                      onClick={() => {
+                        if (!formularioSujo) {
+                          alert("Esse formulário já está limpo");
+                          return;
+                        }
+
+                        if (!window.confirm("Tem certeza que deseja limpar o formulário?")) return;
+
+                        limparFormulario({ keepNovaDireta: true });
+
+                        if (!novaDireta) {
+                          setPaginaAtiva(paginaAnterior || "minhas");
+                          setPaginaAnterior(null);
+                        }
+                      }}
                       className="botao-secundario"
                     >
-                      Cancelar edição
+                      {idEmEdicao
+                        ? "Cancelar edição"
+                        : novaDireta
+                        ? "Limpar formulário"
+                        : "Cancelar"}
                     </button>
-                  )}
                 </div>
               </form>
             </div>
@@ -1085,17 +1198,11 @@ function App() {
 
                               {podeAprovar && (
                                 <>
-                                  <button onClick={() => mudarStatus(s.id, "Pendente")}>
-                                    Pendente
-                                  </button>
                                   <button onClick={() => mudarStatus(s.id, "Em análise")}>
                                     Em análise
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Aprovada")}>
                                     Aprovar
-                                  </button>
-                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
-                                    Comprado
                                   </button>
                                   <button onClick={() => mudarStatus(s.id, "Reprovada")}>
                                     Reprovar
@@ -1103,15 +1210,16 @@ function App() {
                                 </>
                               )}
 
-                              {podeComprar && !podeAprovar && (
-                                <>
+                              {(isComprador || isAdminFull) && (
                                   <button onClick={() => mudarStatus(s.id, "Comprado")}>
                                     Comprado
                                   </button>
-                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
-                                    Reprovar
-                                  </button>
-                                </>
+                              )}
+
+                              {isComprador && (
+                                <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                Reprovar
+                                </button>
                               )}
 
                               {podeExcluir && (

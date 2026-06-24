@@ -8,6 +8,7 @@ export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [solicitacao, setSolicitacao] = useState(null);
+  const [podeAprovar, setPodeAprovar] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -16,6 +17,14 @@ export default function SolicitacaoDetalhe() {
         return;
       }
 
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    const role = userSnap.exists() ? userSnap.data().role : "funcionario";
+    const usuarioPodeAprovar = role === "aprovador" || role === "admin_full";
+
+    setPodeAprovar(usuarioPodeAprovar);
+
       const ref = doc(db, "purchase_requests", id);
       const snap = await getDoc(ref);
 
@@ -23,11 +32,16 @@ export default function SolicitacaoDetalhe() {
         setSolicitacao({ id: snap.id, ...snap.data() });
       }
     });
-    
+
     return () => unsubscribe();
   }, [id, navigate]);
 
-async function aprovar() {
+  async function aprovar() {
+  if (!podeAprovar) {
+    alert("Você não tem permissão para aprovar solicitações.");
+    return;
+  }
+
   await updateDoc(doc(db, "purchase_requests", id), {
     status: "Aprovada",
     aprovada_aprovador: true,
@@ -38,6 +52,7 @@ async function aprovar() {
   const ref = doc(db, "purchase_requests", id);
   const snap = await getDoc(ref);
   const data = snap.data();
+
 
   try {
     const resposta = await fetch("/api/slack-aprovado", {
@@ -63,6 +78,10 @@ async function aprovar() {
 }
 
   async function reprovar() {
+    if (!podeAprovar) {
+      alert("Você não tem permissão para reprovar solicitações.");
+      return;
+    }
     const motivo = prompt("Motivo da reprovação:");
     if (!motivo) return;
 
@@ -130,31 +149,19 @@ return (
 
 <p><strong>Prazo:</strong> {solicitacao.data || "-"}</p>
 
+    {podeAprovar && (
       <div style={{ marginTop: 20 }}>
-        <button onClick={aprovar} style={{
-          background: "green",
-          color: "#fff",
-          border: "none",
-          padding: "10px 15px",
-          borderRadius: 5,
-          cursor: "pointer"
-        }}>
-          Aprovar
+        <button onClick={aprovar}>
+        Aprovar
         </button>
 
-        <button onClick={reprovar} style={{
-          marginLeft: 10,
-          background: "red",
-          color: "#fff",
-          border: "none",
-          padding: "10px 15px",
-          borderRadius: 5,
-          cursor: "pointer"
-        }}>
-          Reprovar
+        <button onClick={reprovar}>
+        Reprovar
         </button>
       </div>
+    )}
+
+      </div>
     </div>
-  </div>
 );
 }
