@@ -7,6 +7,7 @@ import { auth, db } from "./firebase";
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [carregando, setCarregando] = useState(true);
   const [solicitacao, setSolicitacao] = useState(null);
   const [podeAprovar, setPodeAprovar] = useState(false);
 
@@ -31,6 +32,7 @@ export default function SolicitacaoDetalhe() {
       if (snap.exists()) {
         setSolicitacao({ id: snap.id, ...snap.data() });
       }
+    setCarregando(false);
     });
 
     return () => unsubscribe();
@@ -95,7 +97,8 @@ export default function SolicitacaoDetalhe() {
     alert("Reprovado!");
   }
 
-  if (!solicitacao) return <p>Carregando...</p>;
+  if (carregando) return <p>Carregando...</p>;
+  if (!solicitacao) return <p>Solicitação não encontrada</p>;
 
 return (
   <div style={{
