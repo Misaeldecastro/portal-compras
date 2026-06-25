@@ -98,9 +98,6 @@ function App() {
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
-  const filtroStatus = "Todos";
-  const filtroPrioridade = "Todas";
-  const filtroDepartamento = "Todos";
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
