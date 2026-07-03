@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 export default function SolicitacaoDetalhe() {
@@ -38,6 +38,37 @@ export default function SolicitacaoDetalhe() {
     return () => unsubscribe();
   }, [id, navigate]);
 
+  async function notificarSolicitanteSlack(status) {
+    const respostaSlack = await fetch("/api/slack-solicitante", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idSolicitacao: id,
+        item: solicitacao?.item || "",
+        solicitante: solicitacao?.solicitante || "",
+        userEmail: solicitacao?.user_email || "",
+        status,
+      }),
+    });
+
+    if (!respostaSlack.ok) {
+      throw new Error("Slack respondeu com erro");
+    }
+  }
+
+  async function buscarEmailsPorRole(roleAlvo) {
+    const q = query(collection(db, "users"), where("role", "==", roleAlvo));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs
+      .map((d) => d.data())
+      .filter((user) => user.ativo !== false)
+      .map((user) => String(user.email || "").trim())
+      .filter(Boolean);
+  }
+
   async function aprovar() {
   if (!podeAprovar) {
     alert("Você não tem permissão para aprovar solicitações.");
@@ -51,12 +82,21 @@ export default function SolicitacaoDetalhe() {
     motivo_reprovacao: "",
   });
 
+  try {
+    await notificarSolicitanteSlack("Aprovada");
+  } catch (erro) {
+    alert("Solicitação aprovada, mas a notificação Slack ao solicitante falhou.");
+    console.error(erro);
+  }
+
   const ref = doc(db, "purchase_requests", id);
   const snap = await getDoc(ref);
   const data = snap.data();
 
 
   try {
+    const compradorEmails = await buscarEmailsPorRole("comprador");
+
     const resposta = await fetch("/api/slack-aprovado", {
       method: "POST",
       headers: {
@@ -65,6 +105,7 @@ export default function SolicitacaoDetalhe() {
       body: JSON.stringify({
         ...data,
         idSolicitacao: id,
+        destinatariosEmails: compradorEmails,
       }),
     });
 
@@ -93,6 +134,29 @@ export default function SolicitacaoDetalhe() {
       analise_aprovador_finalizada: true,
       motivo_reprovacao: motivo,
     });
+
+    try {
+      const respostaSlack = await fetch("/api/slack-reprovado", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idSolicitacao: id,
+          item: solicitacao?.item || "",
+          solicitante: solicitacao?.solicitante || "",
+          userEmail: solicitacao?.user_email || "",
+          motivoReprovacao: motivo,
+        }),
+      });
+
+      if (!respostaSlack.ok) {
+        throw new Error("Slack respondeu com erro");
+      }
+    } catch (erro) {
+      alert("Solicitação reprovada, mas a notificação Slack falhou. Avise o solicitante manualmente.");
+      console.error(erro);
+    }
 
     alert("Reprovado!");
   }
