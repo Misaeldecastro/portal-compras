@@ -7,6 +7,7 @@ import { auth, db } from "./firebase";
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [carregando, setCarregando] = useState(true);
   const [solicitacao, setSolicitacao] = useState(null);
   const [podeAprovar, setPodeAprovar] = useState(false);
 
@@ -31,10 +32,46 @@ export default function SolicitacaoDetalhe() {
       if (snap.exists()) {
         setSolicitacao({ id: snap.id, ...snap.data() });
       }
+    setCarregando(false);
     });
 
     return () => unsubscribe();
   }, [id, navigate]);
+
+  async function notificarSolicitanteSlack(status) {
+    const respostaSlack = await fetch("/api/slack-solicitante", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idSolicitacao: id,
+        item: solicitacao?.item || "",
+        solicitante: solicitacao?.solicitante || "",
+        userEmail: solicitacao?.user_email || "",
+        status,
+      }),
+    });
+
+    if (!respostaSlack.ok) {
+      throw new Error("Slack respondeu com erro");
+    }
+  }
+
+  async function buscarEmailsPorRole(roleAlvo) {
+    const idToken = await auth.currentUser.getIdToken();
+    const resposta = await fetch(
+      `/api/emails-por-role?role=${encodeURIComponent(roleAlvo)}`,
+      { headers: { Authorization: `Bearer ${idToken}` } }
+    );
+
+    if (!resposta.ok) {
+      throw new Error("Falha ao buscar e-mails por role");
+    }
+
+    const { emails } = await resposta.json();
+    return emails;
+  }
 
   async function aprovar() {
   if (!podeAprovar) {
@@ -49,12 +86,21 @@ export default function SolicitacaoDetalhe() {
     motivo_reprovacao: "",
   });
 
+  try {
+    await notificarSolicitanteSlack("Aprovada");
+  } catch (erro) {
+    alert("Solicitação aprovada, mas a notificação Slack ao solicitante falhou.");
+    console.error(erro);
+  }
+
   const ref = doc(db, "purchase_requests", id);
   const snap = await getDoc(ref);
   const data = snap.data();
 
 
   try {
+    const compradorEmails = await buscarEmailsPorRole("comprador");
+
     const resposta = await fetch("/api/slack-aprovado", {
       method: "POST",
       headers: {
@@ -63,6 +109,7 @@ export default function SolicitacaoDetalhe() {
       body: JSON.stringify({
         ...data,
         idSolicitacao: id,
+        destinatariosEmails: compradorEmails,
       }),
     });
 
@@ -92,10 +139,34 @@ export default function SolicitacaoDetalhe() {
       motivo_reprovacao: motivo,
     });
 
+    try {
+      const respostaSlack = await fetch("/api/slack-reprovado", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idSolicitacao: id,
+          item: solicitacao?.item || "",
+          solicitante: solicitacao?.solicitante || "",
+          userEmail: solicitacao?.user_email || "",
+          motivoReprovacao: motivo,
+        }),
+      });
+
+      if (!respostaSlack.ok) {
+        throw new Error("Slack respondeu com erro");
+      }
+    } catch (erro) {
+      alert("Solicitação reprovada, mas a notificação Slack falhou. Avise o solicitante manualmente.");
+      console.error(erro);
+    }
+
     alert("Reprovado!");
   }
 
-  if (!solicitacao) return <p>Carregando...</p>;
+  if (carregando) return <p>Carregando...</p>;
+  if (!solicitacao) return <p>Solicitação não encontrada</p>;
 
 return (
   <div style={{

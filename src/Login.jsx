@@ -88,9 +88,10 @@ async function cadastrar(e) {
     setSenha("");
     setConfirmarSenha("");
   } catch (error) {
-  console.error("Erro cadastro:", error);
-  alert(`${error.code} - ${error.message}`);
+    console.error("Erro cadastro:", error);
+    alert(`${error.code} - ${error.message}`);
   } finally {
+    sessionStorage.removeItem("cadastroEmAndamento");
     setCarregando(false);
   }
 }

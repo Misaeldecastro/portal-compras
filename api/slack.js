@@ -1,4 +1,5 @@
-import { enviarMensagemParaUsuario } from "./slack-utils.js";
+import "./env.js";
+import { enviarMensagemParaEmails, enviarMensagemParaUsuario } from "./slack-utils.js";
 
 function escaparSlack(texto) {
   return String(texto || "-")
@@ -30,13 +31,19 @@ export default async function handler(req, res) {
       departamento,
       item,
       justificativa,
+      destinatariosEmails = [],
     } = req.body || {};
 
     const aprovadorId = process.env.SLACK_APROVADOR_USER_ID;
     const linkPortal = process.env.PORTAL_URL;
+    const emailsAprovadores = Array.isArray(destinatariosEmails)
+      ? destinatariosEmails.filter(Boolean)
+      : [];
 
-    if (!aprovadorId || !linkPortal) {
-      return res.status(500).json({ error: "SLACK_APROVADOR_USER_ID ou PORTAL_URL não configurado" });
+    if (!process.env.SLACK_BOT_TOKEN || (!emailsAprovadores.length && !aprovadorId) || !linkPortal) {
+      return res.status(500).json({
+        error: "SLACK_BOT_TOKEN, aprovadores por e-mail/SLACK_APROVADOR_USER_ID ou PORTAL_URL não configurado",
+      });
     }
 
   const mensagem = 
@@ -47,7 +54,11 @@ export default async function handler(req, res) {
   `*Item:* ${escaparSlack(item)}\n` +
   `\n*Acessar portal de solicitações:* ${linkPortal}`;
 
-    await enviarMensagemParaUsuario(aprovadorId, mensagem);
+    if (emailsAprovadores.length) {
+      await enviarMensagemParaEmails(emailsAprovadores, mensagem);
+    } else {
+      await enviarMensagemParaUsuario(aprovadorId, mensagem);
+    }
 
     return res.status(200).json({ ok: true });
   } catch (error) {
