@@ -1,3 +1,4 @@
+import "./env.js";
 import { WebClient } from "@slack/web-api";
 import { enviarMensagemParaUsuario } from "./slack-utils.js";
 

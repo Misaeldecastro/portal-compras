@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 export default function SolicitacaoDetalhe() {
@@ -59,14 +59,18 @@ export default function SolicitacaoDetalhe() {
   }
 
   async function buscarEmailsPorRole(roleAlvo) {
-    const q = query(collection(db, "users"), where("role", "==", roleAlvo));
-    const snapshot = await getDocs(q);
+    const idToken = await auth.currentUser.getIdToken();
+    const resposta = await fetch(
+      `/api/emails-por-role?role=${encodeURIComponent(roleAlvo)}`,
+      { headers: { Authorization: `Bearer ${idToken}` } }
+    );
 
-    return snapshot.docs
-      .map((d) => d.data())
-      .filter((user) => user.ativo !== false)
-      .map((user) => String(user.email || "").trim())
-      .filter(Boolean);
+    if (!resposta.ok) {
+      throw new Error("Falha ao buscar e-mails por role");
+    }
+
+    const { emails } = await resposta.json();
+    return emails;
   }
 
   async function aprovar() {

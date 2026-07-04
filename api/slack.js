@@ -1,3 +1,4 @@
+import "./env.js";
 import { enviarMensagemParaEmails, enviarMensagemParaUsuario } from "./slack-utils.js";
 
 function escaparSlack(texto) {

@@ -425,14 +425,18 @@ function App() {
   }
 
   async function buscarEmailsPorRole(roleAlvo) {
-    const q = query(collection(db, "users"), where("role", "==", roleAlvo));
-    const snapshot = await getDocs(q);
+    const idToken = await usuario.getIdToken();
+    const resposta = await fetch(
+      `/api/emails-por-role?role=${encodeURIComponent(roleAlvo)}`,
+      { headers: { Authorization: `Bearer ${idToken}` } }
+    );
 
-    return snapshot.docs
-      .map((d) => d.data())
-      .filter((user) => user.ativo !== false)
-      .map((user) => limparTexto(user.email))
-      .filter(Boolean);
+    if (!resposta.ok) {
+      throw new Error("Falha ao buscar e-mails por role");
+    }
+
+    const { emails } = await resposta.json();
+    return emails;
   }
 
   async function enviarSolicitacao(e) {
