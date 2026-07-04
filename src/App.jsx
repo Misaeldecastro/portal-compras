@@ -98,9 +98,6 @@ function App() {
   const [salvando, setSalvando] = useState(false);
 
   const [busca, setBusca] = useState("");
-  const filtroStatus = "Todos";
-  const filtroPrioridade = "Todas";
-  const filtroDepartamento = "Todos";
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
@@ -401,6 +398,47 @@ function App() {
     return isAprovador || (solicitacaoDoUsuario && analiseAindaAberta);
   }
 
+  async function notificarSolicitanteSlack({
+    idSolicitacao,
+    item,
+    solicitante,
+    userEmail,
+    status,
+  }) {
+    const respostaSlack = await fetch("/api/slack-solicitante", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idSolicitacao,
+        item,
+        solicitante,
+        userEmail,
+        status,
+      }),
+    });
+
+    if (!respostaSlack.ok) {
+      throw new Error("Slack respondeu com erro");
+    }
+  }
+
+  async function buscarEmailsPorRole(roleAlvo) {
+    const idToken = await usuario.getIdToken();
+    const resposta = await fetch(
+      `/api/emails-por-role?role=${encodeURIComponent(roleAlvo)}`,
+      { headers: { Authorization: `Bearer ${idToken}` } }
+    );
+
+    if (!resposta.ok) {
+      throw new Error("Falha ao buscar e-mails por role");
+    }
+
+    const { emails } = await resposta.json();
+    return emails;
+  }
+
   async function enviarSolicitacao(e) {
     e.preventDefault();
     if (!usuario) return alert("Você precisa estar logado.");
@@ -451,6 +489,8 @@ function App() {
         const linkAnalise = `${window.location.origin}/solicitacao/${docRef.id}`;
 
         try {
+          const aprovadorEmails = await buscarEmailsPorRole("aprovador");
+
           const respostaSlack = await fetch("/api/slack", {
             method: "POST",
             headers: {
@@ -468,6 +508,7 @@ function App() {
         justificativa: limparTexto(formulario.justificativa),
         idSolicitacao: docRef.id,
         linkAnalise,
+        destinatariosEmails: aprovadorEmails,
         }),
           });
 
@@ -477,6 +518,19 @@ function App() {
           }
         } catch (erroSlack) {
           console.error("Erro ao chamar /api/slack:", erroSlack);
+        }
+
+        try {
+          await notificarSolicitanteSlack({
+            idSolicitacao: docRef.id,
+            item: payload.item,
+            solicitante: payload.solicitante,
+            userEmail: usuario.email,
+            status: "Pendente",
+          });
+        } catch (erroSlack) {
+          alert("Solicitação enviada, mas a notificação Slack ao solicitante falhou.");
+          console.error("Erro ao notificar solicitante:", erroSlack);
         }
 
         alert("Salvo com sucesso!");
@@ -611,6 +665,51 @@ function App() {
         return;
       }
 
+      if (novoStatus === "Reprovada") {
+        try {
+          const respostaSlack = await fetch("/api/slack-reprovado", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              idSolicitacao: id,
+              item: solicitacaoAtual?.item || "",
+              solicitante: solicitacaoAtual?.solicitante || "",
+              userEmail: solicitacaoAtual?.userEmail || "",
+              motivoReprovacao: motivo,
+            }),
+          });
+
+          if (!respostaSlack.ok) {
+            throw new Error("Slack respondeu com erro");
+          }
+        } catch (erro) {
+          alert("Solicitação reprovada, mas a notificação Slack falhou. Avise o solicitante manualmente.");
+          console.error(erro);
+        }
+      }
+
+      if (novoStatus === "Aprovada" || novoStatus === "Comprado") {
+        try {
+          await notificarSolicitanteSlack({
+            idSolicitacao: id,
+            item: solicitacaoAtual?.item || "",
+            solicitante: solicitacaoAtual?.solicitante || "",
+            userEmail: solicitacaoAtual?.userEmail || "",
+            status: novoStatus,
+          });
+        } catch (erro) {
+          const statusMensagem =
+            novoStatus === "Aprovada" ? "aprovada" : "comprada";
+
+          alert(
+            `Solicitação ${statusMensagem}, mas a notificação Slack ao solicitante falhou.`
+          );
+          console.error(erro);
+        }
+      }
+
       if (novoStatus === "Aprovada" && podeAprovar) {
         try {
           const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
@@ -641,12 +740,17 @@ function App() {
             : null;
 
           if (solicitacaoParaSlack) {
+            const compradorEmails = await buscarEmailsPorRole("comprador");
+
             const respostaSlack = await fetch("/api/slack-aprovado", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify(solicitacaoParaSlack),
+              body: JSON.stringify({
+                ...solicitacaoParaSlack,
+                destinatariosEmails: compradorEmails,
+              }),
             });
 
             if (!respostaSlack.ok) {

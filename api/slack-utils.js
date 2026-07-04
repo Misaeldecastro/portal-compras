@@ -24,3 +24,34 @@ export async function enviarMensagemParaUsuario(userId, texto) {
 
   return resposta;
 }
+
+export async function buscarUsuarioSlackPorEmail(email) {
+  if (!process.env.SLACK_BOT_TOKEN) {
+    throw new Error("SLACK_BOT_TOKEN não configurado");
+  }
+
+  const resposta = await slack.users.lookupByEmail({
+    email,
+  });
+
+  const userId = resposta.user?.id;
+
+  if (!userId) {
+    throw new Error("Usuário do Slack não encontrado pelo e-mail");
+  }
+
+  return userId;
+}
+
+export async function enviarMensagemParaEmail(email, texto) {
+  const userId = await buscarUsuarioSlackPorEmail(email);
+  return enviarMensagemParaUsuario(userId, texto);
+}
+
+export async function enviarMensagemParaEmails(emails, texto) {
+  return Promise.all(
+    emails
+      .filter(Boolean)
+      .map((email) => enviarMensagemParaEmail(email, texto))
+  );
+}
