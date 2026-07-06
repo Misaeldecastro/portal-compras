@@ -5,7 +5,7 @@ import {
   signOut,
   setPersistence,
   sendPasswordResetEmail,
-  browserSessionPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import { auth } from "./firebase";
 import logo from "./assets/logo.png";
@@ -25,7 +25,7 @@ function Login({ onLogin }) {
   sessionStorage.removeItem("cadastroEmAndamento");
 
   try {
-    await setPersistence(auth, browserSessionPersistence);
+    await setPersistence(auth, browserLocalPersistence);
 
     const credencial = await signInWithEmailAndPassword(auth, email, senha);
     onLogin(credencial.user);
