@@ -96,6 +96,7 @@ function App() {
   const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [statusEmAndamento, setStatusEmAndamento] = useState(() => new Set());
 
   const [busca, setBusca] = useState("");
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
@@ -382,6 +383,8 @@ function App() {
 
   async function sair() {
     if (!confirmarSaidaFormulario()) return;
+    const confirmarSaida = window.confirm("Deseja realmente sair?");
+    if (!confirmarSaida) return;
     await signOut(auth);
     setUsuario(null);
   }
@@ -607,10 +610,15 @@ function App() {
   }
 
   async function mudarStatus(id, novoStatus) {
+    if (statusEmAndamento.has(id)) {
+      alert("Esta solicitação já está sendo processada. Aguarde um instante.");
+      return;
+    }
+
     const aprovadorPodeAlterar = podeAprovar;
 
-    const compradorPodeAlterar = 
-    podeComprar && 
+    const compradorPodeAlterar =
+    podeComprar &&
     (novoStatus === "Comprado" || novoStatus === "Reprovada");
 
     if (!aprovadorPodeAlterar && !compradorPodeAlterar) {
@@ -621,6 +629,11 @@ function App() {
     const analiseFinalizadaAprovador =
       podeAprovar && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
     const solicitacaoAtual = solicitacoes.find((s) => s.id === id);
+
+    if (solicitacaoAtual?.status === novoStatus) {
+      alert(`Esta solicitação já está com o status "${novoStatus}".`);
+      return;
+    }
 
     if (analiseFinalizadaAprovador) {
       const acao = novoStatus === "Aprovada" ? "aprovar" : "reprovar";
@@ -635,6 +648,18 @@ function App() {
       if (!confirmado) return;
     }
 
+    if (compradorPodeAlterar && novoStatus === "Comprado") {
+      const nomeSolicitacao = solicitacaoAtual?.item
+        ? ` "${solicitacaoAtual.item}"`
+        : "";
+
+      const confirmado = window.confirm(
+        `Confirma que esta solicitação${nomeSolicitacao} foi realmente comprada?`
+      );
+
+      if (!confirmado) return;
+    }
+
     let motivo = "";
 
     if (novoStatus === "Reprovada") {
@@ -642,6 +667,8 @@ function App() {
       if (r === null) return;
       motivo = r;
     }
+
+    setStatusEmAndamento((atual) => new Set(atual).add(id));
 
     try {
       const dadosAtualizacao = {
@@ -791,6 +818,12 @@ function App() {
     } catch (error) {
       alert("Erro ao alterar status");
       console.error(error);
+    } finally {
+      setStatusEmAndamento((atual) => {
+        const novo = new Set(atual);
+        novo.delete(id);
+        return novo;
+      });
     }
   }
 
@@ -1302,26 +1335,41 @@ function App() {
 
                               {podeAprovar && (
                                 <>
-                                  <button onClick={() => mudarStatus(s.id, "Em análise")}>
+                                  <button
+                                    disabled={statusEmAndamento.has(s.id)}
+                                    onClick={() => mudarStatus(s.id, "Em análise")}
+                                  >
                                     Em análise
                                   </button>
-                                  <button onClick={() => mudarStatus(s.id, "Aprovada")}>
+                                  <button
+                                    disabled={statusEmAndamento.has(s.id)}
+                                    onClick={() => mudarStatus(s.id, "Aprovada")}
+                                  >
                                     Aprovar
                                   </button>
-                                  <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                  <button
+                                    disabled={statusEmAndamento.has(s.id)}
+                                    onClick={() => mudarStatus(s.id, "Reprovada")}
+                                  >
                                     Reprovar
                                   </button>
                                 </>
                               )}
 
                               {(isComprador || isAdminFull) && (
-                                  <button onClick={() => mudarStatus(s.id, "Comprado")}>
+                                  <button
+                                    disabled={statusEmAndamento.has(s.id)}
+                                    onClick={() => mudarStatus(s.id, "Comprado")}
+                                  >
                                     Comprado
                                   </button>
                               )}
 
                               {isComprador && (
-                                <button onClick={() => mudarStatus(s.id, "Reprovada")}>
+                                <button
+                                  disabled={statusEmAndamento.has(s.id)}
+                                  onClick={() => mudarStatus(s.id, "Reprovada")}
+                                >
                                 Reprovar
                                 </button>
                               )}
