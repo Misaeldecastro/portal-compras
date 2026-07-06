@@ -1,0 +1,21 @@
+name: Mirror main to personal repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to personal repo
+        env:
+          PERSONAL_REPO_PAT: ${{ secrets.PERSONAL_REPO_PAT }}
+        run: |
+          git push "https://x-access-token:${PERSONAL_REPO_PAT}@github.com/Misaeldecastro/portal-compras.git" HEAD:main
