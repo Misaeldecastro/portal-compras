@@ -19,4 +19,4 @@ jobs:
         env:
           PERSONAL_REPO_PAT: ${{ secrets.PERSONAL_REPO_PAT }}
         run: |
-          git push "https://x-access-token:${PERSONAL_REPO_PAT}@github.com/Misaeldecastro/portal-compras.git" HEAD:main
+          git push --force "https://x-access-token:${PERSONAL_REPO_PAT}@github.com/Misaeldecastro/portal-compras.git" HEAD:main
