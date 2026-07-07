@@ -1229,8 +1229,24 @@ function App() {
                   })}
 
                   {solicitacoesFiltradas.length === 0 && (
-                    <p>Nenhuma solicitação encontrada.</p>
-                  )}
+                    busca ? (
+                      <div>
+                        <p>Nenhuma solicitação encontrada para este filtro.</p>
+                        <button onClick={() => setBusca("")}>Limpar filtros</button>
+                      </div>
+                    ) : isAprovador || isComprador ? (
+                      <div>
+                        <p>Tudo em dia! Nenhuma solicitação pendente de revisão.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p>Você não tem nenhuma solicitação.</p>
+                        <button onClick={() => navegarParaPagina("nova")}>
+                          Criar primeira solicitação
+                        </button>
+                      </div>
+                      )
+                    )}
                 </div>
               )}
             </div>
