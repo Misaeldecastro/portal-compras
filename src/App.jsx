@@ -97,7 +97,7 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [statusEmAndamento, setStatusEmAndamento] = useState(() => new Set());
-
+  const [filtroStatusCard, setFiltroStatusCard] = useState(null);
   const [busca, setBusca] = useState("");
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
@@ -873,13 +873,17 @@ function App() {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
 
-      return (
+      const bateBusca =
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto)
-      );
+        s.item.toLowerCase().includes(texto);
+
+      const bateStatus = !filtroStatusCard || s.status === filtroStatusCard;
+
+      return bateBusca && bateStatus;
     });
-  }, [solicitacoes, busca]);
+  }, [solicitacoes, busca, filtroStatusCard]);
+
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -1020,30 +1024,61 @@ function App() {
                 </div>
           )}
 
-          {paginaAtiva === "dashboard" && (
-            <div className="cards">
-              <div className="card">
-                <h3>Total</h3>
-                <strong>{total}</strong>
-              </div>
-              <div className="card">
-                <h3>Pendentes</h3>
-                <strong>{pendentes}</strong>
-              </div>
-              <div className="card">
-                <h3>Em análise</h3>
-                <strong>{emAnalise}</strong>
-              </div>
-              <div className="card">
-                <h3>Aprovadas</h3>
-                <strong>{aprovadas}</strong>
-              </div>
-              <div className="card">
-                <h3>Compradas</h3>
-                <strong>{compradas}</strong>
-              </div>
-            </div>
-          )}
+{paginaAtiva === "dashboard" && (
+  <div className="cards">
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard(null);
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Total</h3>
+      <strong>{total}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Pendente");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Pendentes</h3>
+      <strong>{pendentes}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Em análise");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Em análise</h3>
+      <strong>{emAnalise}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Aprovada");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Aprovadas</h3>
+      <strong>{aprovadas}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Comprado");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Compradas</h3>
+      <strong>{compradas}</strong>
+    </div>
+  </div>
+)}
+
 
           {paginaAtiva === "nova" && (
             <div className="bloco">
@@ -1193,6 +1228,13 @@ function App() {
                   onChange={(e) => setBusca(e.target.value)}
                 />
               </div>
+
+              {filtroStatusCard && (
+                <p>
+                  Mostrando apenas: <strong>{filtroStatusCard}</strong>{" "}
+                  <button onClick={() => setFiltroStatusCard(null)}>Limpar filtro</button>
+                </p>
+            )}
 
               {carregando ? (
                 <p>Carregando...</p>
