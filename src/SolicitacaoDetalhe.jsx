@@ -220,6 +220,20 @@ return (
 
 <p><strong>Prazo:</strong> {solicitacao.data || "-"}</p>
 
+{solicitacao.motivo_reprovacao && (
+  <div style={{
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 8,
+    background: "#fee2e2",
+    border: "1px solid #dc2626",
+  }}>
+    <strong>❌ Motivo da reprovação:</strong>
+    <p style={{ margin: "6px 0 0" }}>{solicitacao.motivo_reprovacao}</p>
+  </div>
+)}
+
+
     {podeAprovar && (
       <div style={{ marginTop: 20 }}>
         <button onClick={aprovar}>

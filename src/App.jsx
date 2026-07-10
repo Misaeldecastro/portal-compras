@@ -1357,7 +1357,7 @@ function App() {
                               </div>
 
                               {s.motivoReprovacao && (
-                                <div className="campo-detalhe campo-detalhe-longo">
+                                <div className="aviso-reprovacao">
                                   <span>Motivo da reprovação</span>
                                   <strong>{s.motivoReprovacao}</strong>
                                 </div>
