@@ -99,6 +99,7 @@ function App() {
   const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [solicitacaoCriada, setSolicitacaoCriada] = useState(null);
   const [statusEmAndamento, setStatusEmAndamento] = useState(() => new Set());
   const [filtroStatusCard, setFiltroStatusCard] = useState(null);
   const [busca, setBusca] = useState("");
@@ -583,12 +584,16 @@ function exportarPDF() {
           console.error("Erro ao notificar solicitante:", erroSlack);
         }
 
-        alert("Salvo com sucesso!");
+       setSolicitacaoCriada({ id: docRef.id, item: payload.item });
+
       }
+
+      const eraEdicao = Boolean(idEmEdicao);
 
       limparFormulario();
       await buscarSolicitacoes();
-      setPaginaAtiva("minhas");
+      setPaginaAtiva(eraEdicao ? "minhas" : "sucesso");
+
     } catch (error) {
       alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
       console.error(error);
@@ -1257,6 +1262,36 @@ function exportarPDF() {
               </form>
             </div>
           )}
+          {paginaAtiva === "sucesso" && solicitacaoCriada && (
+  <div className="bloco">
+    <h2>Solicitação enviada!</h2>
+    <p>Seu pedido foi recebido e está em análise. Você será notificado sobre o andamento.</p>
+    <p><strong>Item:</strong> {solicitacaoCriada.item}</p>
+
+    <div className="acoes-formulario">
+      <button
+        type="button"
+        onClick={() => {
+          setSolicitacaoAbertaId(solicitacaoCriada.id);
+          setSolicitacaoCriada(null);
+          setPaginaAtiva("minhas");
+        }}
+      >
+        Ver minha solicitação
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSolicitacaoCriada(null);
+          setPaginaAtiva("nova");
+        }}
+      >
+        Nova solicitação
+      </button>
+    </div>
+  </div>
+)}
+
 
           {paginaAtiva === "minhas" && (
             <div className="bloco">
