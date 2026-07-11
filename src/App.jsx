@@ -18,6 +18,9 @@ import {
 import { auth, db } from "./firebase";
 import Login from "./Login";
 import logo from "./assets/logo.png";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 
 
 const formularioInicial = {
@@ -441,6 +444,50 @@ function App() {
     const { emails } = await resposta.json();
     return emails;
   }
+  
+  function exportarCSV() {
+  const agora = new Date();
+  const timestamp = agora.toLocaleString("sv").replace(/[: ]/g, "-");
+  const cabecalho = "Solicitante,Departamento,Item,Status,Prioridade,Data\n";
+
+
+  const linhas = solicitacoesFiltradas.map(
+    (s) => `${s.solicitante},${s.departamento},${s.item},${s.status},${s.prioridade},${s.dataCriacao}`
+  );
+
+  const csv = cabecalho + linhas.join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `solicitacoes-${timestamp}.csv`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function exportarPDF() {
+  const agora = new Date();
+  const timestamp = agora.toLocaleString("sv").replace(/[: ]/g, "-");
+
+  const documento = new jsPDF();
+
+  autoTable(documento, {
+    head: [["Solicitante", "Departamento", "Item", "Status", "Prioridade", "Data"]],
+    body: solicitacoesFiltradas.map((s) => [
+      s.solicitante,
+      s.departamento,
+      s.item,
+      s.status,
+      s.prioridade,
+      s.dataCriacao,
+    ]),
+  });
+
+  documento.save(`solicitacoes-${timestamp}.pdf`);
+}
+
 
   async function enviarSolicitacao(e) {
     e.preventDefault();
@@ -1228,6 +1275,16 @@ function App() {
                   onChange={(e) => setBusca(e.target.value)}
                 />
               </div>
+
+              <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
+                <button type="button" onClick={exportarCSV}>
+                  Exportar CSV
+                </button>         
+                <button type="button" onClick={exportarPDF}>
+                  Exportar PDF
+                </button>
+              </div>
+
 
               {filtroStatusCard && (
                 <p>
