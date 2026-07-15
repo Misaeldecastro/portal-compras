@@ -18,6 +18,9 @@ import {
 import { auth, db } from "./firebase";
 import Login from "./Login";
 import logo from "./assets/logo.png";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 
 
 const formularioInicial = {
@@ -96,8 +99,9 @@ function App() {
   const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [solicitacaoCriada, setSolicitacaoCriada] = useState(null);
   const [statusEmAndamento, setStatusEmAndamento] = useState(() => new Set());
-
+  const [filtroStatusCard, setFiltroStatusCard] = useState(null);
   const [busca, setBusca] = useState("");
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
@@ -441,6 +445,50 @@ function App() {
     const { emails } = await resposta.json();
     return emails;
   }
+  
+  function exportarCSV() {
+  const agora = new Date();
+  const timestamp = agora.toLocaleString("sv").replace(/[: ]/g, "-");
+  const cabecalho = "Solicitante,Departamento,Item,Status,Prioridade,Data\n";
+
+
+  const linhas = solicitacoesFiltradas.map(
+    (s) => `${s.solicitante},${s.departamento},${s.item},${s.status},${s.prioridade},${s.dataCriacao}`
+  );
+
+  const csv = cabecalho + linhas.join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `solicitacoes-${timestamp}.csv`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function exportarPDF() {
+  const agora = new Date();
+  const timestamp = agora.toLocaleString("sv").replace(/[: ]/g, "-");
+
+  const documento = new jsPDF();
+
+  autoTable(documento, {
+    head: [["Solicitante", "Departamento", "Item", "Status", "Prioridade", "Data"]],
+    body: solicitacoesFiltradas.map((s) => [
+      s.solicitante,
+      s.departamento,
+      s.item,
+      s.status,
+      s.prioridade,
+      s.dataCriacao,
+    ]),
+  });
+
+  documento.save(`solicitacoes-${timestamp}.pdf`);
+}
+
 
   async function enviarSolicitacao(e) {
     e.preventDefault();
@@ -536,12 +584,16 @@ function App() {
           console.error("Erro ao notificar solicitante:", erroSlack);
         }
 
-        alert("Salvo com sucesso!");
+       setSolicitacaoCriada({ id: docRef.id, item: payload.item });
+
       }
+
+      const eraEdicao = Boolean(idEmEdicao);
 
       limparFormulario();
       await buscarSolicitacoes();
-      setPaginaAtiva("minhas");
+      setPaginaAtiva(eraEdicao ? "minhas" : "sucesso");
+
     } catch (error) {
       alert(idEmEdicao ? "Erro ao editar" : "Erro ao salvar");
       console.error(error);
@@ -873,13 +925,17 @@ function App() {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
 
-      return (
+      const bateBusca =
         s.solicitante.toLowerCase().includes(texto) ||
         s.departamento.toLowerCase().includes(texto) ||
-        s.item.toLowerCase().includes(texto)
-      );
+        s.item.toLowerCase().includes(texto);
+
+      const bateStatus = !filtroStatusCard || s.status === filtroStatusCard;
+
+      return bateBusca && bateStatus;
     });
-  }, [solicitacoes, busca]);
+  }, [solicitacoes, busca, filtroStatusCard]);
+
 
   const total = solicitacoes.length;
   const pendentes = solicitacoes.filter((s) => s.status === "Pendente").length;
@@ -1020,30 +1076,61 @@ function App() {
                 </div>
           )}
 
-          {paginaAtiva === "dashboard" && (
-            <div className="cards">
-              <div className="card">
-                <h3>Total</h3>
-                <strong>{total}</strong>
-              </div>
-              <div className="card">
-                <h3>Pendentes</h3>
-                <strong>{pendentes}</strong>
-              </div>
-              <div className="card">
-                <h3>Em análise</h3>
-                <strong>{emAnalise}</strong>
-              </div>
-              <div className="card">
-                <h3>Aprovadas</h3>
-                <strong>{aprovadas}</strong>
-              </div>
-              <div className="card">
-                <h3>Compradas</h3>
-                <strong>{compradas}</strong>
-              </div>
-            </div>
-          )}
+{paginaAtiva === "dashboard" && (
+  <div className="cards">
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard(null);
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Total</h3>
+      <strong>{total}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Pendente");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Pendentes</h3>
+      <strong>{pendentes}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Em análise");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Em análise</h3>
+      <strong>{emAnalise}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Aprovada");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Aprovadas</h3>
+      <strong>{aprovadas}</strong>
+    </div>
+    <div
+      className="card"
+      onClick={() => {
+        setFiltroStatusCard("Comprado");
+        navegarParaPagina("minhas");
+      }}
+    >
+      <h3>Compradas</h3>
+      <strong>{compradas}</strong>
+    </div>
+  </div>
+)}
+
 
           {paginaAtiva === "nova" && (
             <div className="bloco">
@@ -1175,6 +1262,36 @@ function App() {
               </form>
             </div>
           )}
+          {paginaAtiva === "sucesso" && solicitacaoCriada && (
+  <div className="bloco">
+    <h2>Solicitação enviada!</h2>
+    <p>Seu pedido foi recebido e está em análise. Você será notificado sobre o andamento.</p>
+    <p><strong>Item:</strong> {solicitacaoCriada.item}</p>
+
+    <div className="acoes-formulario">
+      <button
+        type="button"
+        onClick={() => {
+          setSolicitacaoAbertaId(solicitacaoCriada.id);
+          setSolicitacaoCriada(null);
+          setPaginaAtiva("minhas");
+        }}
+      >
+        Ver minha solicitação
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSolicitacaoCriada(null);
+          setPaginaAtiva("nova");
+        }}
+      >
+        Nova solicitação
+      </button>
+    </div>
+  </div>
+)}
+
 
           {paginaAtiva === "minhas" && (
             <div className="bloco">
@@ -1193,6 +1310,23 @@ function App() {
                   onChange={(e) => setBusca(e.target.value)}
                 />
               </div>
+
+              <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
+                <button type="button" onClick={exportarCSV}>
+                  Exportar CSV
+                </button>         
+                <button type="button" onClick={exportarPDF}>
+                  Exportar PDF
+                </button>
+              </div>
+
+
+              {filtroStatusCard && (
+                <p>
+                  Mostrando apenas: <strong>{filtroStatusCard}</strong>{" "}
+                  <button onClick={() => setFiltroStatusCard(null)}>Limpar filtro</button>
+                </p>
+            )}
 
               {carregando ? (
                 <p>Carregando...</p>
@@ -1315,7 +1449,7 @@ function App() {
                               </div>
 
                               {s.motivoReprovacao && (
-                                <div className="campo-detalhe campo-detalhe-longo">
+                                <div className="aviso-reprovacao">
                                   <span>Motivo da reprovação</span>
                                   <strong>{s.motivoReprovacao}</strong>
                                 </div>
