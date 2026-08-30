@@ -22,6 +22,16 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 
+async function getDocComRetry(docRef, tentativas = 3) {
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await getDoc(docRef);
+    } catch (error) {
+      if (error.code !== "unavailable" || i === tentativas - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
+    }
+  }
+}
 
 const formularioInicial = {
   solicitante: "",
@@ -198,7 +208,7 @@ function App() {
 
     try {
       const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDocComRetry(docRef);
 
       if (!docSnap.exists()) {
         await setDoc(docRef, {
