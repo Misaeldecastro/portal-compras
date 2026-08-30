@@ -225,7 +225,7 @@ function App() {
 
       setUsuario(user);
     } catch (error) {
-      console.error("Erro ao buscar usuário:", error);
+      console.error("Erro ao buscar usuário:", error.code, "|", error.message);
       setUsuario(user);
       setRole("funcionario");
     } finally {
