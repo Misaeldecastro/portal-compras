@@ -1,22 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
   getDoc,
   addDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   doc,
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./Login";
+import SolicitacaoCard from "./components/SolicitacaoCard";
+import FormularioSolicitacao from "./components/FormularioSolicitacao";
+import ColaboradorItem from "./components/ColaboradorItem";
+import { useColaboradores } from "./hooks/useColaboradores";
+import { useSolicitacoes } from "./hooks/useSolicitacoes";
+import {
+  buscarEmailsPorRole,
+  notificarNovaSolicitacaoSlack,
+  notificarSolicitanteSlack,
+} from "./services/slackApi";
 import logo from "./assets/logo.png";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -103,14 +108,12 @@ function validarFormulario(form) {
 
 function App() {
   const [usuario, setUsuario] = useState(null);
-  const [solicitacoes, setSolicitacoes] = useState([]);
   const [paginaAtiva, setPaginaAtiva] = useState("dashboard");
   const [paginaAnterior, setPaginaAnterior] = useState(null);
   const [novaDireta, setNovaDireta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [solicitacaoCriada, setSolicitacaoCriada] = useState(null);
-  const [statusEmAndamento, setStatusEmAndamento] = useState(() => new Set());
   const [filtroStatusCard, setFiltroStatusCard] = useState(null);
   const [busca, setBusca] = useState("");
   const [pedidoBaseadoEmReprovada, setPedidoBaseadoEmReprovada] = useState(false);
@@ -119,8 +122,6 @@ function App() {
 
   const [formulario, setFormulario] = useState(formularioInicial);
   const [role, setRole] = useState("funcionario");
-
-  const [colaboradores, setColaboradores] = useState([]);
 
   const formularioSujo = useMemo(() => {
     if (idEmEdicao !== null) return true;
@@ -166,12 +167,6 @@ function App() {
       window.removeEventListener("popstate", handlePopState);
     };
   }, [formularioSujo]);
-  const [carregandoColaboradores, setCarregandoColaboradores] = useState(false);
-  const [rolesEditados, setRolesEditados] = useState({});
-  const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState(null);
-  const [statusEditados, setStatusEditados] = useState({});
-  const [mensagensColaboradores, setMensagensColaboradores] = useState({});
-
 
   const emailLogado = usuario?.email?.toLowerCase().trim();
   const isAdminFull = role === "admin_full";
@@ -179,10 +174,46 @@ function App() {
   const isAprovador = role === "aprovador";
   const isComprador = role === "comprador";
   const podeAprovar = isAprovador || isAdminFull;
+
+  const {
+    colaboradores,
+    carregandoColaboradores,
+    rolesEditados,
+    setRolesEditados,
+    colaboradorEmEdicao,
+    setColaboradorEmEdicao,
+    statusEditados,
+    setStatusEditados,
+    mensagensColaboradores,
+    buscarColaboradores,
+    salvarColaborador,
+  } = useColaboradores({ isAdminFull });
   const podeComprar = isComprador || isAdminFull;
   const podeExcluir = isAprovador || isAdminFull;
 
-  
+  const {
+    solicitacoes,
+    statusEmAndamento,
+    buscarSolicitacoes,
+    excluirSolicitacao,
+    mudarStatus,
+  } = useSolicitacoes({
+    usuario,
+    role,
+    isAprovador,
+    isAdminFull,
+    isComprador,
+    podeAprovar,
+    podeComprar,
+    setCarregando,
+    onExcluida: (id) => {
+      if (idEmEdicao === id) limparFormulario();
+    },
+    onRemovidaDaLista: (id) =>
+      setSolicitacaoAbertaId((prev) => (prev === id ? null : prev)),
+  });
+
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       const cadastroEmAndamento =
@@ -246,111 +277,6 @@ function App() {
   return () => unsubscribe();    
 }, []);
 
-  const buscarColaboradores = useCallback(async function buscarColaboradores() {
-  if (!isAdminFull) return;
-
-  setCarregandoColaboradores(true);
-
-  try {
-    const snapshot = await getDocs(collection(db, "users"));
-
-    const lista = snapshot.docs.map((d) => ({
-      uid: d.id,
-      email: d.data().email || "",
-      role: d.data().role || "funcionario",
-      ativo: d.data().ativo !== false,
-    }));
-
-    setColaboradores(lista);
-  } catch (error) {
-    console.error("Erro ao buscar colaboradores:", error);
-    alert("Erro ao buscar colaboradores.");
-  } finally {
-    setCarregandoColaboradores(false);
-  }
-  }, [isAdminFull]);
-
-  useEffect(() => {
-    if (usuario) buscarSolicitacoes();
-    else setSolicitacoes([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, role]);
-
-  async function buscarSolicitacoes() {
-    if (!usuario) return;
-    setCarregando(true);
-
-    try {
-      let q;
-
-  if (isAprovador || isAdminFull) {
-    q = query(
-    collection(db, "purchase_requests"),
-    orderBy("data_criacao", "desc")
-  );
-  } else if (isComprador) {
-    q = query(
-      collection(db, "purchase_requests"),
-      where("aprovada_aprovador", "==", true),
-      orderBy("data_criacao", "desc")
-    );
-  } else {
-    q = query(
-      collection(db, "purchase_requests"),
-      where("user_id", "==", usuario.uid),
-      orderBy("data_criacao", "desc")
-    );
-  }
-
-      const snapshot = await getDocs(q);
-
-      const dadosTratados = snapshot.docs.map((d) => {
-        const item = d.data();
-        const dataObj =
-          item.data_criacao?.toDate ? item.data_criacao.toDate() : null;
-
-        return {
-          id: d.id,
-          solicitante: item.solicitante || "",
-          departamento: item.departamento || "",
-          item: item.item || "",
-          quantidade: item.quantidade || 0,
-          prioridade: item.prioridade || "Média",
-          linkProduto1: item.link_produto_1 || "",
-          linkProduto2: item.link_produto_2 || "",
-          data: item.data || "",
-          justificativa: item.justificativa || "",
-          status: item.status || "Pendente",
-          dataCriacao: dataObj ? dataObj.toLocaleString("pt-BR") : "",
-          dataCriacaoTs: dataObj ? dataObj.getTime() : 0,
-          motivoReprovacao: item.motivo_reprovacao || "",
-          userId: item.user_id || "",
-          userEmail: item.user_email || "",
-          aprovadaAprovador: item.aprovada_aprovador === true,
-          analiseAprovadorFinalizada: item.analise_aprovador_finalizada === true,
-        };
-      });
-
-      setSolicitacoes(
-        isAprovador
-          ? dadosTratados.filter(
-              (s) =>
-                !s.aprovadaAprovador &&
-                !s.analiseAprovadorFinalizada &&
-                !["Aprovada", "Reprovada", "Comprado"].includes(s.status)
-            )
-          : dadosTratados
-      );
-    } catch (error) {
-      console.error("Erro ao buscar:", error);
-
-      if (!auth.currentUser) return;
-
-      alert("Erro ao buscar solicitações");
-    } finally {
-      setCarregando(false);
-    }
-  }
 
   useEffect(() => {
     if (paginaAtiva === "colaboradores" && isAdminFull) {
@@ -372,6 +298,22 @@ function App() {
 
     if (!keepNovaDireta) {
       setNovaDireta(false);
+      setPaginaAnterior(null);
+    }
+  }
+
+  function cancelarFormulario() {
+    if (!formularioSujo) {
+      alert("Esse formulário já está limpo");
+      return;
+    }
+
+    if (!window.confirm("Tem certeza que deseja limpar o formulário?")) return;
+
+    limparFormulario({ keepNovaDireta: true });
+
+    if (!novaDireta) {
+      setPaginaAtiva(paginaAnterior || "minhas");
       setPaginaAnterior(null);
     }
   }
@@ -415,47 +357,6 @@ function App() {
     return isAprovador || (solicitacaoDoUsuario && analiseAindaAberta);
   }
 
-  async function notificarSolicitanteSlack({
-    idSolicitacao,
-    item,
-    solicitante,
-    userEmail,
-    status,
-  }) {
-    const respostaSlack = await fetch("/api/slack-solicitante", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        idSolicitacao,
-        item,
-        solicitante,
-        userEmail,
-        status,
-      }),
-    });
-
-    if (!respostaSlack.ok) {
-      throw new Error("Slack respondeu com erro");
-    }
-  }
-
-  async function buscarEmailsPorRole(roleAlvo) {
-    const idToken = await usuario.getIdToken();
-    const resposta = await fetch(
-      `/api/emails-por-role?role=${encodeURIComponent(roleAlvo)}`,
-      { headers: { Authorization: `Bearer ${idToken}` } }
-    );
-
-    if (!resposta.ok) {
-      throw new Error("Falha ao buscar e-mails por role");
-    }
-
-    const { emails } = await resposta.json();
-    return emails;
-  }
-  
   function exportarCSV() {
   const agora = new Date();
   const timestamp = agora.toLocaleString("sv").replace(/[: ]/g, "-");
@@ -550,27 +451,21 @@ function exportarPDF() {
         const linkAnalise = `${window.location.origin}/solicitacao/${docRef.id}`;
 
         try {
-          const aprovadorEmails = await buscarEmailsPorRole("aprovador");
+          const aprovadorEmails = await buscarEmailsPorRole(usuario, "aprovador");
 
-          const respostaSlack = await fetch("/api/slack", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-      body: JSON.stringify({
-        solicitante: limparTexto(formulario.solicitante),
-        departamento: limparTexto(formulario.departamento),
-        item: limparTexto(formulario.item),
-        quantidade: Number(formulario.quantidade),
-        prioridade: limparTexto(formulario.prioridade),
-        linkProduto1: limparTexto(formulario.linkProduto1),
-        linkProduto2: limparTexto(formulario.linkProduto2),
-        data: formulario.data || "",
-        justificativa: limparTexto(formulario.justificativa),
-        idSolicitacao: docRef.id,
-        linkAnalise,
-        destinatariosEmails: aprovadorEmails,
-        }),
+          const respostaSlack = await notificarNovaSolicitacaoSlack({
+            solicitante: limparTexto(formulario.solicitante),
+            departamento: limparTexto(formulario.departamento),
+            item: limparTexto(formulario.item),
+            quantidade: Number(formulario.quantidade),
+            prioridade: limparTexto(formulario.prioridade),
+            linkProduto1: limparTexto(formulario.linkProduto1),
+            linkProduto2: limparTexto(formulario.linkProduto2),
+            data: formulario.data || "",
+            justificativa: limparTexto(formulario.justificativa),
+            idSolicitacao: docRef.id,
+            linkAnalise,
+            destinatariosEmails: aprovadorEmails,
           });
 
           if (!respostaSlack.ok) {
@@ -658,279 +553,6 @@ function exportarPDF() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function excluirSolicitacao(id) {
-    if (!window.confirm("Tem certeza que deseja excluir esta solicitação?")) return;
-
-    try {
-      await deleteDoc(doc(db, "purchase_requests", id));
-      if (idEmEdicao === id) limparFormulario();
-      await buscarSolicitacoes();
-    } catch (error) {
-      alert("Erro ao excluir");
-      console.error(error);
-    }
-  }
-
-  async function mudarStatus(id, novoStatus) {
-    if (statusEmAndamento.has(id)) {
-      alert("Esta solicitação já está sendo processada. Aguarde um instante.");
-      return;
-    }
-
-    const aprovadorPodeAlterar = podeAprovar;
-
-    const compradorPodeAlterar =
-    podeComprar &&
-    (novoStatus === "Comprado" || novoStatus === "Reprovada");
-
-    if (!aprovadorPodeAlterar && !compradorPodeAlterar) {
-      alert("Você não tem permissão para alterar o status.");
-      return;
-    }
-
-    const analiseFinalizadaAprovador =
-      podeAprovar && (novoStatus === "Aprovada" || novoStatus === "Reprovada");
-    const solicitacaoAtual = solicitacoes.find((s) => s.id === id);
-
-    if (solicitacaoAtual?.status === novoStatus) {
-      alert(`Esta solicitação já está com o status "${novoStatus}".`);
-      return;
-    }
-
-    if (analiseFinalizadaAprovador) {
-      const acao = novoStatus === "Aprovada" ? "aprovar" : "reprovar";
-      const nomeSolicitacao = solicitacaoAtual?.item
-        ? ` "${solicitacaoAtual.item}"`
-        : "";
-
-      const confirmado = window.confirm(
-        `Tem certeza que deseja ${acao} esta solicitação${nomeSolicitacao}? Depois disso ela sairá da sua lista.`
-      );
-
-      if (!confirmado) return;
-    }
-
-    if (compradorPodeAlterar && novoStatus === "Comprado") {
-      const nomeSolicitacao = solicitacaoAtual?.item
-        ? ` "${solicitacaoAtual.item}"`
-        : "";
-
-      const confirmado = window.confirm(
-        `Confirma que esta solicitação${nomeSolicitacao} foi realmente comprada?`
-      );
-
-      if (!confirmado) return;
-    }
-
-    let motivo = "";
-
-    if (novoStatus === "Reprovada") {
-      const r = window.prompt("Digite o motivo da reprovação:");
-      if (r === null) return;
-      motivo = r;
-    }
-
-    setStatusEmAndamento((atual) => new Set(atual).add(id));
-
-    try {
-      const dadosAtualizacao = {
-        status: novoStatus,
-        motivo_reprovacao: novoStatus === "Reprovada" ? motivo : "",
-      };
-
-      if (novoStatus === "Aprovada" && podeAprovar) {
-        dadosAtualizacao.aprovada_aprovador = true;
-      }
-
-      if (analiseFinalizadaAprovador) {
-        dadosAtualizacao.analise_aprovador_finalizada = true;
-      }
-
-      try {
-        await updateDoc(doc(db, "purchase_requests", id), dadosAtualizacao);
-      } catch (erro) {
-        alert("Erro ao salvar aprovação. Tente novamente.");
-        console.error(erro);
-        return;
-      }
-
-      if (novoStatus === "Reprovada") {
-        try {
-          const respostaSlack = await fetch("/api/slack-reprovado", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              idSolicitacao: id,
-              item: solicitacaoAtual?.item || "",
-              solicitante: solicitacaoAtual?.solicitante || "",
-              userEmail: solicitacaoAtual?.userEmail || "",
-              motivoReprovacao: motivo,
-            }),
-          });
-
-          if (!respostaSlack.ok) {
-            throw new Error("Slack respondeu com erro");
-          }
-        } catch (erro) {
-          alert("Solicitação reprovada, mas a notificação Slack falhou. Avise o solicitante manualmente.");
-          console.error(erro);
-        }
-      }
-
-      if (novoStatus === "Aprovada" || novoStatus === "Comprado") {
-        try {
-          await notificarSolicitanteSlack({
-            idSolicitacao: id,
-            item: solicitacaoAtual?.item || "",
-            solicitante: solicitacaoAtual?.solicitante || "",
-            userEmail: solicitacaoAtual?.userEmail || "",
-            status: novoStatus,
-          });
-        } catch (erro) {
-          const statusMensagem =
-            novoStatus === "Aprovada" ? "aprovada" : "comprada";
-
-          alert(
-            `Solicitação ${statusMensagem}, mas a notificação Slack ao solicitante falhou.`
-          );
-          console.error(erro);
-        }
-      }
-
-      if (novoStatus === "Aprovada" && podeAprovar) {
-        try {
-          const snapAtualizado = await getDoc(doc(db, "purchase_requests", id));
-
-          const dadosAtualizados = snapAtualizado.exists()
-            ? snapAtualizado.data()
-            : null;
-
-          const solicitacaoParaSlack = dadosAtualizados
-            ? {
-                id,
-                solicitante: dadosAtualizados.solicitante || "",
-                departamento: dadosAtualizados.departamento || "",
-                item: dadosAtualizados.item || "",
-                quantidade: dadosAtualizados.quantidade || 0,
-                prioridade: dadosAtualizados.prioridade || "",
-                linkProduto1: dadosAtualizados.link_produto_1 || "",
-                linkProduto2: dadosAtualizados.link_produto_2 || "",
-                data: dadosAtualizados.data || "",
-                justificativa: dadosAtualizados.justificativa || "",
-                status: novoStatus,
-              }
-            : solicitacaoAtual
-            ? {
-                ...solicitacaoAtual,
-                status: novoStatus,
-              }
-            : null;
-
-          if (solicitacaoParaSlack) {
-            const compradorEmails = await buscarEmailsPorRole("comprador");
-
-            const respostaSlack = await fetch("/api/slack-aprovado", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                ...solicitacaoParaSlack,
-                destinatariosEmails: compradorEmails,
-              }),
-            });
-
-            if (!respostaSlack.ok) {
-              throw new Error("Slack respondeu com erro");
-            }
-          }
-        } catch (erro) {
-          alert("Solicitação aprovada, mas a notificação Slack falhou. Avise o Comprador manualmente.");
-          console.error(erro);
-        }
-      }
-      const deveRemoverDaLista =
-        analiseFinalizadaAprovador && isAprovador && !isAdminFull;
-
-      if (deveRemoverDaLista) {
-        setSolicitacoes((prev) => prev.filter((s) => s.id !== id));
-        setSolicitacaoAbertaId((prev) => (prev === id ? null : prev));
-      } else {
-        setSolicitacoes((prev) =>
-          prev.map((s) =>
-            s.id === id
-              ? {
-                  ...s,
-                  status: novoStatus,
-                  motivoReprovacao: novoStatus === "Reprovada" ? motivo : "",
-                  aprovadaAprovador:
-                    novoStatus === "Aprovada" && podeAprovar
-                      ? true
-                      : s.aprovadaAprovador,
-                  analiseAprovadorFinalizada: analiseFinalizadaAprovador
-                    ? true
-                    : s.analiseAprovadorFinalizada,
-                }
-              : s
-          )
-        );
-      }
-    } catch (error) {
-      alert("Erro ao alterar status");
-      console.error(error);
-    } finally {
-      setStatusEmAndamento((atual) => {
-        const novo = new Set(atual);
-        novo.delete(id);
-        return novo;
-      });
-    }
-  }
-
-
-  async function salvarColaborador(uid, novoRole, ativo) {
-    if (!isAdminFull) return; 
-
-    try {
-      await updateDoc(doc(db, "users", uid), {
-        role: novoRole,
-        ativo,
-      });
-
-      setColaboradores((prev) =>
-        prev.map((c) =>
-          c.uid === uid ? { ...c, role: novoRole, ativo } : c
-        )
-      );
-
-      setRolesEditados((prev) => {
-        const novo = { ...prev };
-        delete novo[uid];
-        return novo;
-      });
-
-      setStatusEditados((prev) => {
-        const novo = { ...prev };
-        delete novo[uid];
-        return novo;
-      });
-
-      setMensagensColaboradores((prev) => ({
-        ...prev,
-        [uid]: "Salvo com sucesso!",
-      }));
-
-      setColaboradorEmEdicao(null);
-
-    } catch (error) {
-      console.error("Erro ao salvar colaborador:",error);
-      alert("Erro ao salvar colaborador.");
-    }
-  }
-
-  
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter((s) => {
       const texto = busca.toLowerCase();
@@ -1002,88 +624,48 @@ function exportarPDF() {
           </p>
 
           {paginaAtiva === "colaboradores" && isAdminFull && (
-          <div className="bloco">
-          <h2>Colaboradores</h2>
+            <div className="bloco">
+              <h2>Colaboradores</h2>
 
-          {carregandoColaboradores ? (
-            <p>Carregando...</p>
-            ) : (
-            <div className="lista">
-              {colaboradores.map((colaborador) => (
-                <article key={colaborador.uid} className="item-lista">
-                  <div className="colaborador-cabecalho">
-                  <div>
-                   <strong>{colaborador.email || colaborador.uid}</strong>
-                   <p>{colaborador.ativo ? "Ativo" : "Desativado"}</p>
-                  </div>
-
-                  <button
-                   type="button"
-                   className="botao-editar-colaborador"
-                  onClick={() => 
-                    setColaboradorEmEdicao((uidAtual) =>
-                      uidAtual === colaborador.uid ? null : colaborador.uid
-                    )
-                  }
-                  title="Editar colaborador"
-                  >
-                    <i className="fi fi-rr-edit"></i>
-                  </button>
-                </div> 
-
-                  {colaboradorEmEdicao === colaborador.uid && (
-                   <>
-                  <select
-                   value={rolesEditados[colaborador.uid] || colaborador.role}
-                   onChange={(e) =>
-                    setRolesEditados((prev) => ({
-                    ...prev,
-                    [colaborador.uid]: e.target.value,
-                    }))
-                    }
-                  >
-                    <option value="funcionario">Funcionário</option>
-                    <option value="admin_full">Admin Full</option>
-                    <option value="aprovador">Aprovador</option>
-                    <option value="comprador">Comprador</option>
-                  </select>
-
-                    <button
-                     type="button"
-                     onClick={() =>
-                      setStatusEditados((prev) => ({
-                      ...prev,
-                     [colaborador.uid]: !(prev[colaborador.uid] ?? colaborador.ativo),
-                      }))
-                      }
-                    >
-                      {(statusEditados[colaborador.uid] ?? colaborador.ativo)
-                      ? "Desativar"
-                      : "Ativar"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        salvarColaborador(
-                          colaborador.uid,
-                          rolesEditados[colaborador.uid] || colaborador.role,
-                          statusEditados[colaborador.uid] ?? colaborador.ativo
+              {carregandoColaboradores ? (
+                <p>Carregando...</p>
+              ) : (
+                <div className="lista">
+                  {colaboradores.map((colaborador) => (
+                    <ColaboradorItem
+                      key={colaborador.uid}
+                      colaborador={colaborador}
+                      emEdicao={colaboradorEmEdicao === colaborador.uid}
+                      roleEditado={rolesEditados[colaborador.uid]}
+                      statusEditado={statusEditados[colaborador.uid]}
+                      mensagem={mensagensColaboradores[colaborador.uid]}
+                      onToggleEdicao={() =>
+                        setColaboradorEmEdicao((uidAtual) =>
+                          uidAtual === colaborador.uid ? null : colaborador.uid
                         )
                       }
-                    >
-                      Salvar
-                    </button>
-                  </>
-                  )}
-                  {mensagensColaboradores[colaborador.uid] && (
-                  <p>{mensagensColaboradores[colaborador.uid]}</p>
-                  )}
-                </article>
-                ))}
+                      onChangeRole={(novoRole) =>
+                        setRolesEditados((prev) => ({
+                          ...prev,
+                          [colaborador.uid]: novoRole,
+                        }))
+                      }
+                      onToggleStatus={() =>
+                        setStatusEditados((prev) => ({
+                          ...prev,
+                          [colaborador.uid]: !(
+                            prev[colaborador.uid] ?? colaborador.ativo
+                          ),
+                        }))
+                      }
+                      onSalvar={(novoRole, ativo) =>
+                        salvarColaborador(colaborador.uid, novoRole, ativo)
+                      }
+                    />
+                  ))}
                 </div>
-                )}
-                </div>
+              )}
+            </div>
           )}
 
 {paginaAtiva === "dashboard" && (
@@ -1143,134 +725,16 @@ function exportarPDF() {
 
 
           {paginaAtiva === "nova" && (
-            <div className="bloco">
-              <h2>{idEmEdicao ? "Editar solicitação" : "Nova solicitação"}</h2>
-
-              {pedidoBaseadoEmReprovada && (
-                <p>
-                  <strong>Atenção! Esta solicitação é baseada em uma solicitação reprovada. Revise as informações e envie novamente.</strong>
-                </p>
-              )}
-
-              <form onSubmit={enviarSolicitacao} className="formulario">
-                <textarea
-                  name="justificativa"
-                  placeholder="Justificativa/ Descrição"
-                  value={formulario.justificativa}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <input
-                  name="solicitante"
-                  placeholder="Solicitante"
-                  value={formulario.solicitante}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <input
-                  name="departamento"
-                  placeholder="Departamento"
-                  value={formulario.departamento}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <input
-                  name="item"
-                  placeholder="Item solicitado"
-                  value={formulario.item}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <input
-                  name="quantidade"
-                  placeholder="Quantidade"
-                  value={formulario.quantidade}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <select
-                  name="prioridade"
-                  value={formulario.prioridade}
-                  onChange={alterarFormulario}
-                >
-                  <option value="Alta">Prioridade Alta</option>
-                  <option value="Média">Prioridade Média</option>
-                  <option value="Baixa">Prioridade Baixa</option>
-                </select>
-
-                <input
-                  name="linkProduto1"
-                  placeholder="Link do produto 1"
-                  value={formulario.linkProduto1}
-                  onChange={alterarFormulario}
-                  required
-                />
-
-                <input
-                  name="linkProduto2"
-                  placeholder="Link do produto 2 (opcional)"
-                  value={formulario.linkProduto2}
-                  onChange={alterarFormulario}
-                />
-
-
-                <div className="campo-form">
-                  <label>Prazo</label>
-                  <input
-                  name="data"
-                  type="date"
-                  value={formulario.data}
-                  onChange={alterarFormulario}
-                  required
-                />
-                </div>
-
-                
-
-                <div className="acoes-formulario">
-                  <button type="submit" disabled={salvando}>
-                    {salvando
-                      ? "Salvando..."
-                      : pedidoBaseadoEmReprovada
-                      ? "Criar nova solicitação"
-                      : idEmEdicao
-                      ? "Salvar edição"
-                      : "Enviar solicitação"}
-                  </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!formularioSujo) {
-                          alert("Esse formulário já está limpo");
-                          return;
-                        }
-
-                        if (!window.confirm("Tem certeza que deseja limpar o formulário?")) return;
-
-                        limparFormulario({ keepNovaDireta: true });
-
-                        if (!novaDireta) {
-                          setPaginaAtiva(paginaAnterior || "minhas");
-                          setPaginaAnterior(null);
-                        }
-                      }}
-                      className="botao-secundario"
-                    >
-                      {idEmEdicao
-                        ? "Cancelar edição"
-                        : novaDireta
-                        ? "Limpar formulário"
-                        : "Cancelar"}
-                    </button>
-                </div>
-              </form>
-            </div>
+            <FormularioSolicitacao
+              formulario={formulario}
+              onChange={alterarFormulario}
+              onSubmit={enviarSolicitacao}
+              salvando={salvando}
+              idEmEdicao={idEmEdicao}
+              pedidoBaseadoEmReprovada={pedidoBaseadoEmReprovada}
+              novaDireta={novaDireta}
+              onCancelar={cancelarFormulario}
+            />
           )}
           {paginaAtiva === "sucesso" && solicitacaoCriada && (
   <div className="bloco">
@@ -1342,196 +806,28 @@ function exportarPDF() {
                 <p>Carregando...</p>
               ) : (
                 <div className="lista">
-                  {solicitacoesFiltradas.map((s) => {
-                    const estaAberta = solicitacaoAbertaId === s.id;
-                    const podeEditar = podeEditarSolicitacao(s);
-                    const statusNormalizado = (s.status || "").toLowerCase();
-                    const statusClasse =
-                      statusNormalizado === "comprado"
-                        ? "comprado"
-                        : statusNormalizado === "pendente"
-                        ? "pendente"
-                        : ["reprovada", "reprovado", "recusada", "recusado"].includes(
-                            statusNormalizado
-                          )
-                        ? "recusado"
-                        : "neutro";
-
-                    return (
-                      <article
-                        key={s.id}
-                        className={`item-lista item-lista-acordeao ${
-                          estaAberta ? "aberto" : ""
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className="titulo-solicitacao"
-                          onClick={() =>
-                            setSolicitacaoAbertaId(estaAberta ? null : s.id)
-                          }
-                          aria-expanded={estaAberta}
-                          aria-controls={`detalhes-${s.id}`}
-                        >
-                          <span className="cabecalho-solicitacao">
-                            <span className="nome-solicitacao">
-                              {s.item || "Solicitação sem título"}
-                            </span>
-                            <span className={`selo-status ${statusClasse}`}>
-                              {s.status || "Sem status"}
-                            </span>
-                          </span>
-                        </button>
-
-                        {estaAberta && (
-                          <div
-                            id={`detalhes-${s.id}`}
-                            className="conteudo-solicitacao"
-                          >
-                            <div className="detalhes-solicitacao">
-                              <div className="campo-detalhe">
-                                <span>Solicitante</span>
-                                <strong>{s.solicitante || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Departamento</span>
-                                <strong>{s.departamento || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Quantidade</span>
-                                <strong>{s.quantidade}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Prioridade</span>
-                                <strong>{s.prioridade || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Status</span>
-                                <strong>{s.status || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Usuário</span>
-                                <strong>{s.userEmail || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Link do produto 1</span>
-                                <strong>
-                                  {s.linkProduto1 ? (
-                                    <a
-                                      href={s.linkProduto1}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      Abrir link
-                                    </a>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Link do produto 2</span>
-                                <strong>
-                                  {s.linkProduto2 ? (
-                                    <a
-                                      href={s.linkProduto2}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      Abrir link
-                                    </a>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Data</span>
-                                <strong>{s.data || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe">
-                                <span>Data da solicitação</span>
-                                <strong>{s.dataCriacao || "-"}</strong>
-                              </div>
-                              <div className="campo-detalhe campo-detalhe-longo">
-                                <span>Justificativa</span>
-                                <strong>{s.justificativa || "-"}</strong>
-                              </div>
-
-                              {s.motivoReprovacao && (
-                                <div className="aviso-reprovacao">
-                                  <span>Motivo da reprovação</span>
-                                  <strong>{s.motivoReprovacao}</strong>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="acoes">
-                              <button onClick={() => pedirNovamente(s)}>
-                                Pedir novamente
-                              </button>
-
-                              {podeEditar && (
-                                <button onClick={() => editarSolicitacao(s)}>
-                                  Editar
-                                </button>
-                              )}
-
-                              {podeAprovar && (
-                                <>
-                                  <button
-                                    disabled={statusEmAndamento.has(s.id)}
-                                    onClick={() => mudarStatus(s.id, "Em análise")}
-                                  >
-                                    Em análise
-                                  </button>
-                                  <button
-                                    disabled={statusEmAndamento.has(s.id)}
-                                    onClick={() => mudarStatus(s.id, "Aprovada")}
-                                  >
-                                    Aprovar
-                                  </button>
-                                  <button
-                                    disabled={statusEmAndamento.has(s.id)}
-                                    onClick={() => mudarStatus(s.id, "Reprovada")}
-                                  >
-                                    Reprovar
-                                  </button>
-                                </>
-                              )}
-
-                              {(isComprador || isAdminFull) && (
-                                  <button
-                                    disabled={statusEmAndamento.has(s.id)}
-                                    onClick={() => mudarStatus(s.id, "Comprado")}
-                                  >
-                                    Comprado
-                                  </button>
-                              )}
-
-                              {isComprador && (
-                                <button
-                                  disabled={statusEmAndamento.has(s.id)}
-                                  onClick={() => mudarStatus(s.id, "Reprovada")}
-                                >
-                                Reprovar
-                                </button>
-                              )}
-
-                              {podeExcluir && (
-                                <button
-                                  onClick={() => excluirSolicitacao(s.id)}
-                                  style={{ background: "#dc2626" }}
-                                >
-                                  Excluir
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
+                  {solicitacoesFiltradas.map((s) => (
+                    <SolicitacaoCard
+                      key={s.id}
+                      solicitacao={s}
+                      estaAberta={solicitacaoAbertaId === s.id}
+                      onToggle={() =>
+                        setSolicitacaoAbertaId(
+                          solicitacaoAbertaId === s.id ? null : s.id
+                        )
+                      }
+                      podeEditar={podeEditarSolicitacao(s)}
+                      podeAprovar={podeAprovar}
+                      podeExcluir={podeExcluir}
+                      isComprador={isComprador}
+                      isAdminFull={isAdminFull}
+                      emAndamento={statusEmAndamento.has(s.id)}
+                      onPedirNovamente={pedirNovamente}
+                      onEditar={editarSolicitacao}
+                      onMudarStatus={mudarStatus}
+                      onExcluir={excluirSolicitacao}
+                    />
+                  ))}
 
                   {solicitacoesFiltradas.length === 0 && (
                     busca ? (

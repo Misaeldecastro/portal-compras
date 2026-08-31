@@ -704,3 +704,11 @@ body {
     padding: 2px 16px 16px;
   }
 }
+
+
+.obs-prazo {
+  display: block;
+  margin-top: 10px;
+  color:#696060;
+  font-size: 17px;
+}
