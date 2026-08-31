@@ -107,6 +107,19 @@ function validarFormulario(form) {
 }
 
 function App() {
+  const [tema, setTema] = useState(
+    () => localStorage.getItem("tema") || "claro"
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema;
+    localStorage.setItem("tema", tema);
+  }, [tema]);
+
+  function alternarTema() {
+    setTema((atual) => (atual === "claro" ? "escuro" : "claro"));
+  }
+
   const [usuario, setUsuario] = useState(null);
   const [paginaAtiva, setPaginaAtiva] = useState("dashboard");
   const [paginaAnterior, setPaginaAnterior] = useState(null);
@@ -608,13 +621,18 @@ function exportarPDF() {
       <div className="main-area">
         <header className="topbar">
           <h1>Portal de Solicitações</h1>
-          <button
-            onClick={async () => {
-              await sair();
-            }}
-          >
-            Sair
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button type="button" className="botao-secundario" onClick={alternarTema}>
+              {tema === "claro" ? "Tema escuro" : "Tema claro"}
+            </button>
+            <button
+              onClick={async () => {
+                await sair();
+              }}
+            >
+              Sair
+            </button>
+          </div>
         </header>
 
         <main className="content">
