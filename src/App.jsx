@@ -108,7 +108,7 @@ function validarFormulario(form) {
 
 function App() {
   const [tema, setTema] = useState(
-    () => localStorage.getItem("tema") || "claro"
+    () => localStorage.getItem("tema") || "escuro"
   );
 
   useEffect(() => {
