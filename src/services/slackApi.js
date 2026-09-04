@@ -1,7 +1,21 @@
+import { auth } from "../firebase";
+
 async function postJson(caminho, payload) {
+  // Os endpoints do Slack passaram a exigir ID token. Pegar o usuário de
+  // auth.currentUser aqui evita ter que passá-lo por todas as chamadas —
+  // todas elas já acontecem dentro de fluxos autenticados.
+  const usuario = auth.currentUser;
+
+  if (!usuario) {
+    throw new Error("Sem sessão ativa para notificar o Slack");
+  }
+
   return fetch(caminho, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await usuario.getIdToken()}`,
+    },
     body: JSON.stringify(payload),
   });
 }

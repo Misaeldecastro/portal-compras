@@ -1,14 +1,14 @@
-import { adminAuth, adminDb } from "./firebase-admin.js";
+import { adminDb } from "./firebase-admin.js";
+import { aplicarCors } from "./http.js";
+import { exigirAutenticacao } from "./auth.js";
 
 const ROLES_PERMITIDAS = new Set(["aprovador", "comprador"]);
 
 export default async function handler(req, res) {
-  const origemPermitida =
-    process.env.PORTAL_URL || "https://portal-compras-five.vercel.app";
-
-  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  aplicarCors(res, {
+    metodos: "GET, OPTIONS",
+    cabecalhos: "Content-Type, Authorization",
+  });
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -23,16 +23,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Parâmetro 'role' inválido" });
   }
 
-  const idToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!idToken) {
-    return res.status(401).json({ error: "Token de autenticação ausente" });
-  }
-
-  try {
-    await adminAuth.verifyIdToken(idToken);
-  } catch {
-    return res.status(401).json({ error: "Token inválido ou expirado" });
-  }
+  if (!(await exigirAutenticacao(req, res))) return;
 
   try {
     const snapshot = await adminDb

@@ -13,5 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// O (default) do prj-prd-infra-01 pertence a outra aplicação; o portal usa um
+// banco nomeado. Precisa bater com o "database" declarado no firebase.json.
+const DATABASE_ID = "portal-compras";
+
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, DATABASE_ID);

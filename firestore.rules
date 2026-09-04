@@ -1,0 +1,83 @@
+rules_version = '2';
+
+// Regras do banco nomeado "portal-compras" em prj-prd-infra-01.
+//
+// O pool de Auth é compartilhado com os outros apps do projeto
+// (intranet-oliv-e, vitals-olive-prd). Entrar no portal é liberado para
+// qualquer conta do pool — o App.jsx cria users/{uid} como "funcionario" no
+// primeiro login. Administrar, não: a role só muda por um admin_full.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function dadosUsuario() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function ativo() {
+      return dadosUsuario().ativo != false;
+    }
+
+    function papel() {
+      return dadosUsuario().role;
+    }
+
+    function ehAdminFull() {
+      return autenticado() && ativo() && papel() == 'admin_full';
+    }
+
+    function ehAprovador() {
+      return autenticado() && ativo() && papel() == 'aprovador';
+    }
+
+    function ehComprador() {
+      return autenticado() && ativo() && papel() == 'comprador';
+    }
+
+    match /users/{uid} {
+      allow get: if autenticado() && (request.auth.uid == uid || ehAdminFull());
+      allow list: if ehAdminFull();
+
+      // Auto-provisionamento: cada um cria o próprio documento, e só como
+      // funcionário ativo. É isto que impede alguém de se promover a
+      // admin_full escrevendo direto pelo console do navegador.
+      allow create: if autenticado()
+                    && request.auth.uid == uid
+                    && request.resource.data.role == 'funcionario'
+                    && request.resource.data.ativo == true;
+
+      allow update: if ehAdminFull();
+      allow delete: if false;
+    }
+
+    match /purchase_requests/{id} {
+      // Avaliada por documento retornado: uma query sem filtro feita por um
+      // funcionário falha inteira, em vez de vazar as solicitações alheias.
+      allow read: if autenticado() && ativo() && (
+                       resource.data.user_id == request.auth.uid
+                    || ehAprovador()
+                    || ehAdminFull()
+                    || (ehComprador() && resource.data.aprovada_aprovador == true)
+                  );
+
+      allow create: if autenticado() && ativo()
+                    && request.resource.data.user_id == request.auth.uid;
+
+      allow update: if ehAprovador()
+                    || ehAdminFull()
+                    || ehComprador()
+                    || (resource.data.user_id == request.auth.uid
+                        && resource.data.analise_aprovador_finalizada == false);
+
+      allow delete: if ehAprovador() || ehAdminFull();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

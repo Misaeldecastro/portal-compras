@@ -1,5 +1,14 @@
 {
   "projects": {
-    "default": "portal-compras-1af5d"
+    "default": "prj-prd-infra-01"
+  },
+  "targets": {
+    "prj-prd-infra-01": {
+      "hosting": {
+        "portal": [
+          "compras-oliv-e"
+        ]
+      }
+    }
   }
 }

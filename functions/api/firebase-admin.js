@@ -1,24 +1,15 @@
-import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
-function criarApp() {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replaceAll("\\n", "\n");
+// O projeto prj-prd-infra-01 é compartilhado e seu Firestore (default) já
+// pertence a outra aplicação. O portal vive num banco nomeado.
+export const DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "portal-compras";
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL ou FIREBASE_PRIVATE_KEY não configurado"
-    );
-  }
-
-  return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  });
-}
-
-const app = getApps()[0] || criarApp();
+// Sem credencial explícita: dentro do Cloud Functions o Admin SDK usa a
+// identidade da própria função (ADC). O trio FIREBASE_PROJECT_ID /
+// CLIENT_EMAIL / PRIVATE_KEY era exigência da Vercel, que rodava fora do GCP.
+const app = getApps()[0] || initializeApp();
 
 export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app);
+export const adminDb = getFirestore(app, DATABASE_ID);

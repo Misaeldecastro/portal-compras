@@ -1,5 +1,6 @@
-import { WebClient } from "@slack/web-api";
-import { enviarMensagemParaUsuario } from "./slack-utils.js";
+import { enviarMensagemParaUsuario, obterClienteSlack } from "./slack-utils.js";
+import { aplicarCors, PORTAL_URL } from "./http.js";
+import { exigirAutenticacao } from "./auth.js";
 
 function escaparSlack(texto) {
   return String(texto || "-")
@@ -32,12 +33,7 @@ function montarMensagem({ status, item, solicitante, linkSolicitacao }) {
 }
 
 export default async function handler(req, res) {
-  const origemPermitida =
-    process.env.PORTAL_URL || "https://portal-compras-five.vercel.app";
-
-  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  aplicarCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -46,6 +42,8 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
   }
+
+  if (!(await exigirAutenticacao(req, res))) return;
 
   try {
     const {
@@ -56,11 +54,11 @@ export default async function handler(req, res) {
       status,
     } = req.body || {};
 
-    const linkPortal = process.env.PORTAL_URL;
+    const linkPortal = PORTAL_URL;
 
-    if (!process.env.SLACK_BOT_TOKEN || !linkPortal) {
+    if (!process.env.SLACK_BOT_TOKEN) {
       return res.status(500).json({
-        error: "SLACK_BOT_TOKEN ou PORTAL_URL não configurado",
+        error: "SLACK_BOT_TOKEN não configurado",
       });
     }
 
@@ -70,7 +68,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+    const slack = obterClienteSlack();
 
     const usuarioSlack = await slack.users.lookupByEmail({
       email: userEmail,
