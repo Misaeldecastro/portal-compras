@@ -1,4 +1,6 @@
 import { enviarMensagemParaEmails, enviarMensagemParaUsuario } from "./slack-utils.js";
+import { aplicarCors, PORTAL_URL } from "./http.js";
+import { exigirAutenticacao } from "./auth.js";
 
 function escaparSlack(texto) {
   return String(texto || "-")
@@ -9,12 +11,7 @@ function escaparSlack(texto) {
 }
 
 export default async function handler(req, res) {
-  const origemPermitida =
-    process.env.PORTAL_URL || "https://portal-compras-five.vercel.app";
-
-  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  aplicarCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -24,18 +21,20 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
+  if (!(await exigirAutenticacao(req, res))) return;
+
   try {
     const data = req.body || {};
 
-    const linkPortal = process.env.PORTAL_URL;
+    const linkPortal = PORTAL_URL;
     const compradorId = process.env.SLACK_COMPRADOR_USER_ID;
     const compradorEmails = Array.isArray(data.destinatariosEmails)
       ? data.destinatariosEmails.filter(Boolean)
       : [];
 
-    if (!process.env.SLACK_BOT_TOKEN || (!compradorEmails.length && !compradorId) || !linkPortal) {
+    if (!process.env.SLACK_BOT_TOKEN || (!compradorEmails.length && !compradorId)) {
       return res.status(500).json({
-        error: "SLACK_BOT_TOKEN, compradores por e-mail/SLACK_COMPRADOR_USER_ID ou PORTAL_URL não configurado",
+        error: "SLACK_BOT_TOKEN ou compradores por e-mail/SLACK_COMPRADOR_USER_ID não configurado",
       });
     }
 

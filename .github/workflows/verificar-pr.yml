@@ -1,0 +1,33 @@
+name: Verificação de PR
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Sem as variáveis VITE_*: este passo verifica que o código compila, não
+      # que a config está certa. Por isso o job não declara environment e não
+      # recebe a chave da service account — um PR não precisa de credencial de
+      # deploy, e não tê-la elimina o risco de vazá-la.
+      - name: Build
+        run: npm run build
+
+      - name: Verificar dependências das functions
+        run: npm ci --prefix functions

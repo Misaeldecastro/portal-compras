@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "purchase_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprovada_aprovador", "order": "ASCENDING" },
+        { "fieldPath": "data_criacao", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "purchase_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "data_criacao", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
